@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "brand": "Toyota",
+    "model": "Camry",
+    "year": 2021,
+    "engine_volume": 2500,
+    "auction_price_jpy": 1500000,
+    "shipping_to_vladivostok_jpy": 150000
+  },
+  {
+    "id": 2,
+    "brand": "Honda",
+    "model": "CR-V",
+    "year": 2018,
+    "engine_volume": 2000,
+    "auction_price_jpy": 1200000,
+    "shipping_to_vladivostok_jpy": 130000
+  },
+  {
+    "id": 3,
+    "brand": "Nissan",
+    "model": "Skyline",
+    "year": 2023,
+    "engine_volume": 3000,
+    "auction_price_jpy": 2200000,
+    "shipping_to_vladivostok_jpy": 180000
+  }
+]
