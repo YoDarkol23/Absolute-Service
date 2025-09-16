@@ -131,7 +131,11 @@ std::optional<std::string> selectCity() {
 
 // Основная функция
 int main() {
-    setlocale(LC_ALL, "Russian");  // для Windows, если нужна кириллица
+    #ifdef _WIN32
+    setlocale(LC_ALL, "Russian");
+#else
+    setlocale(LC_ALL, "ru_RU.UTF-8");
+#endif
 
     auto cars = loadCars("cars.json");
     if (!cars.has_value()) {
@@ -204,3 +208,4 @@ int main() {
 
     return 0;
 }
+
