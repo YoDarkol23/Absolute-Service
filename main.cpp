@@ -144,7 +144,19 @@ int main() {
     setlocale(LC_ALL, "ru_RU.UTF-8");
     #endif
 
-    auto cars = loadCars("cars.json");
+    // Получаем путь к директории исполняемого файла
+    #ifdef _WIN32
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    std::filesystem::path exePath(buffer);
+    std::filesystem::path exeDir = exePath.parent_path();
+    std::string jsonPath = (exeDir / "cars.json").string();
+    #else
+    std::filesystem::path exePath = std::filesystem::current_path();
+    std::string jsonPath = (exePath / "cars.json").string();
+    #endif
+    
+    auto cars = loadCars(jsonPath);
     if (!cars.has_value()) {
         return 1;
     }
@@ -215,3 +227,4 @@ int main() {
 
     return 0;
 }
+
