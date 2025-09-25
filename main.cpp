@@ -7,6 +7,11 @@
 #include <iomanip>
 #include <algorithm>
 #include <filesystem>
+#include <locale>
+#include <codecvt>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "json.hpp"  // nlohmann/json
 
 using json = nlohmann::json;
@@ -17,7 +22,7 @@ struct Car {
     std::string brand;
     std::string model;
     int year;
-    double engine_volume;
+    int engine_volume;
     int auction_price_jpy;
     int shipping_to_vladivostok_jpy;
 };
@@ -131,11 +136,13 @@ std::optional<std::string> selectCity() {
 
 // Основная функция
 int main() {
+    // Установка кодировки для корректного отображения русского текста в Windows
     #ifdef _WIN32
-    setlocale(LC_ALL, "Russian");
-#else
+    SetConsoleOutputCP(65001);  // CP_UTF8
+    SetConsoleCP(65001);        // CP_UTF8
+    #else
     setlocale(LC_ALL, "ru_RU.UTF-8");
-#endif
+    #endif
 
     auto cars = loadCars("cars.json");
     if (!cars.has_value()) {
@@ -150,7 +157,7 @@ int main() {
     std::cout << "🚘 Доступные автомобили:\n";
     for (const auto& car : *cars) {
         std::cout << car.id << ". " << car.brand << " " << car.model
-                  << " (" << car.year << ", " << car.engine_volume << "L)\n";
+                  << " (" << car.year << ", " << car.engine_volume << "cm)\n";
     }
 
     int carId;
@@ -208,4 +215,3 @@ int main() {
 
     return 0;
 }
-
