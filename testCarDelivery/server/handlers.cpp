@@ -12,6 +12,7 @@
 #include "handlers.hpp"
 #include "../common/utils.hpp"
 #include <iostream>
+#include <regex>
 
 std::string handle_get_cars() {
     // Читаем файл с автомобилями
@@ -26,10 +27,53 @@ std::string handle_get_cars() {
     return content;
 }
 
-std::string handle_admin_request(const std::string& request) {
-    // Простая проверка: если в теле есть "action", считаем запрос валидным
-    if (request.find("\"action\"") != std::string::npos) {
-        return R"({"status": "success", "message": "Admin command executed"})";
+std::string handle_admin_request(const HttpRequest& request) {
+    // Логируем админский запрос
+    std::cout << "[ADMIN] Method: " << request.method << ", Path: " << request.path << std::endl;
+    
+    // Простая маршрутизация для админов
+    if (request.method == "GET" && request.path == "/status") {
+        return create_http_response(
+            R"({"status": "success", "message": "Server is running", "clients": "active"})"
+        );
     }
-    return R"({"error": "Invalid admin request. Include \"action\" in JSON body."})";
+    else if (request.method == "POST" && request.path == "/reload") {
+        // Заглушка для перезагрузки данных
+        return create_http_response(
+            R"({"status": "success", "message": "Data reloaded"})"
+        );
+    }
+    else {
+        return create_http_response(
+            R"({"error": "Admin endpoint not found. Try GET /status or POST /reload"})", 
+            404
+        );
+    }
+}
+
+std::string handle_client_request(const HttpRequest& request) {
+    // Обрабатываем только GET запросы для клиентов
+    if (request.method != "GET") {
+        return create_http_response(
+            R"({"error": "Method not allowed"})", 
+            405
+        );
+    }
+    
+    // Маршрутизация клиентских запросов
+    if (request.path == "/cars" || request.path == "/cars/" || request.path.find("/cars?") == 0) {
+        std::string cars_data = handle_get_cars();
+        return create_http_response(cars_data);
+    }
+    else if (request.path == "/" || request.path == "/health") {
+        return create_http_response(
+            R"({"status": "ok", "service": "CarDelivery API"})"
+        );
+    }
+    else {
+        return create_http_response(
+            R"({"error": "Endpoint not found. Try GET /cars"})", 
+            404
+        );
+    }
 }

@@ -19,20 +19,8 @@
 #include <sstream>
 #include <regex>
 
-// === Структура для разобранного HTTP-запроса ===
-struct HttpRequest {
-    std::string method;
-    std::string path;
-    std::string version;
-    std::unordered_map<std::string, std::string> headers;
-    std::string body;
-};
+// === Реализация парсинга HTTP ===
 
-// === Функции парсинга HTTP ===
-
-/**
- * @brief Парсит первую строку HTTP-запроса
- */
 bool parse_request_line(const std::string& line, HttpRequest& request) {
     std::regex request_line_regex(R"(^(\w+)\s+([^\s]+)\s+HTTP/(\d\.\d)$)");
     std::smatch matches;
@@ -46,9 +34,6 @@ bool parse_request_line(const std::string& line, HttpRequest& request) {
     return false;
 }
 
-/**
- * @brief Парсит заголовки HTTP
- */
 void parse_headers(const std::vector<std::string>& header_lines, HttpRequest& request) {
     std::regex header_regex(R"(^([^:]+):\s*(.+)$)");
     
@@ -65,9 +50,6 @@ void parse_headers(const std::vector<std::string>& header_lines, HttpRequest& re
     }
 }
 
-/**
- * @brief Основная функция парсинга HTTP-запроса
- */
 HttpRequest parse_http_request(const std::string& raw_request) {
     HttpRequest request;
     
@@ -121,9 +103,6 @@ HttpRequest parse_http_request(const std::string& raw_request) {
     return request;
 }
 
-/**
- * @brief Извлекает параметры запроса из пути
- */
 std::unordered_map<std::string, std::string> parse_query_params(const std::string& path) {
     std::unordered_map<std::string, std::string> params;
     
@@ -141,9 +120,6 @@ std::unordered_map<std::string, std::string> parse_query_params(const std::strin
         if (eq_pos != std::string::npos) {
             std::string key = pair.substr(0, eq_pos);
             std::string value = pair.substr(eq_pos + 1);
-            
-            // URL decode (базовый вариант)
-            // TODO: добавить полноценное URL decoding
             params[key] = value;
         }
     }
@@ -151,11 +127,8 @@ std::unordered_map<std::string, std::string> parse_query_params(const std::strin
     return params;
 }
 
-/**
- * @brief Создает HTTP-ответ
- */
-std::string create_http_response(const std::string& body, int status_code = 200, 
-                                const std::string& content_type = "application/json") {
+std::string create_http_response(const std::string& body, int status_code, 
+                                const std::string& content_type) {
     std::ostringstream response;
     
     response << "HTTP/1.1 " << status_code << " ";
@@ -172,7 +145,7 @@ std::string create_http_response(const std::string& body, int status_code = 200,
              << "Content-Type: " << content_type << "\r\n"
              << "Content-Length: " << body.size() << "\r\n"
              << "Connection: close\r\n"
-             << "Access-Control-Allow-Origin: *\r\n"  // CORS для веб-клиентов
+             << "Access-Control-Allow-Origin: *\r\n"
              << "\r\n"
              << body;
     
@@ -230,6 +203,10 @@ CarDeliveryServer::CarDeliveryServer(unsigned short client_port, unsigned short 
       admin_acceptor_(io_context_, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), admin_port)) {}
 
 void CarDeliveryServer::run() {
+    std::cout << "🚗 Сервер CarDelivery запущен:\n";
+    std::cout << "   • Клиентский порт: " << client_acceptor_.local_endpoint().port() << "\n";
+    std::cout << "   • Админский порт: " << admin_acceptor_.local_endpoint().port() << "\n";
+    std::cout << "   Ожидание подключений...\n\n";
     start_acceptors();
 }
 
@@ -254,8 +231,11 @@ void CarDeliveryServer::start_acceptors() {
         }
     });
 
-    client_thread.join();
-    admin_thread.join();
+    client_thread.detach();
+    admin_thread.detach();
+    
+    // Главный поток продолжает работу
+    io_context_.run();
 }
 
 void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::socket> socket, bool is_admin) {
@@ -266,19 +246,19 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         std::cout << "[+] Новое " << (is_admin ? "АДМИН" : "КЛИЕНТ") 
                   << "-подключение от " << client_ip << std::endl;
 
-        // Читаем весь запрос
+        // Читаем запрос
         boost::asio::streambuf buffer;
         boost::system::error_code error;
         
-        // Читаем до конца запроса (определяем по Content-Length или соединению)
+        // Читаем до конца заголовков
         size_t bytes_read = boost::asio::read_until(*socket, buffer, "\r\n\r\n", error);
         
         if (error && error != boost::asio::error::eof) {
-            throw std::runtime_error("Error reading request: " + error.message());
+            throw std::runtime_error("Ошибка чтения запроса: " + error.message());
         }
 
         // Преобразуем в строку
-        std::string request{
+        std::string request_data{
             std::istreambuf_iterator<char>(&buffer),
             std::istreambuf_iterator<char>()
         };
@@ -287,7 +267,7 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         
         try {
             // Парсим HTTP-запрос
-            HttpRequest http_request = parse_http_request(request);
+            HttpRequest http_request = parse_http_request(request_data);
             
             std::cout << "[" << (is_admin ? "ADMIN" : "CLIENT") << "] "
                       << http_request.method << " " << http_request.path 
@@ -308,7 +288,9 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
 
         // Отправляем ответ
         boost::asio::write(*socket, boost::asio::buffer(response));
-        std::cout << "[✓] Запрос от " << client_ip << " обработан успешно\n";
+        socket->close();
+        
+        std::cout << "[✓] Запрос от " << client_ip << " обработан успешно\n\n";
 
     } catch (std::exception& e) {
         std::cerr << "[!] Ошибка при обработке " 

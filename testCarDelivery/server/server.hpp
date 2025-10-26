@@ -16,6 +16,28 @@
 #include <condition_variable>
 #include <functional>
 #include <memory>
+#include <unordered_map>
+
+// Структура для разобранного HTTP-запроса
+struct HttpRequest {
+    std::string method;
+    std::string path;
+    std::string version;
+    std::unordered_map<std::string, std::string> headers;
+    std::string body;
+    
+    // Вспомогательные методы
+    std::string get_header(const std::string& name) const {
+        auto it = headers.find(name);
+        return it != headers.end() ? it->second : "";
+    }
+};
+
+// Функции парсинга HTTP (объявления)
+HttpRequest parse_http_request(const std::string& raw_request);
+std::unordered_map<std::string, std::string> parse_query_params(const std::string& path);
+std::string create_http_response(const std::string& body, int status_code = 200, 
+                                const std::string& content_type = "application/json");
 
 /**
  * Простой пул потоков.
