@@ -1,79 +1,46 @@
-/**
- * @file server/handlers.cpp
- * @brief Реализация бизнес-логики сервера.
- * 
- * Содержит обработчики:
- * - GET /cars → возвращает список автомобилей
- * - Админ-запросы → заглушка (готова к расширению)
- * 
- * Все данные читаются из папки ./data/
- */
-
+// handlers.cpp (обновлённый)
 #include "handlers.hpp"
 #include "../common/utils.hpp"
 #include <iostream>
-#include <regex>
 
-std::string handle_get_cars() {
-    // Читаем файл с автомобилями
+HttpResponse handle_get_cars() {
     std::string content = read_file("data/cars.json");
     
-    // Если файл пустой или ошибка — возвращаем понятный JSON
     if (content.empty() || content.find("error") != std::string::npos) {
         std::cerr << "⚠️  Не удалось загрузить data/cars.json\n";
-        return R"([{"error": "No cars available. Check server data directory."}])";
+        return HttpResponse::error_response(500, "No cars available. Check server data directory.");
     }
     
-    return content;
+    return HttpResponse::json_response(content);
 }
 
-std::string handle_admin_request(const HttpRequest& request) {
-    // Логируем админский запрос
-    std::cout << "[ADMIN] Method: " << request.method << ", Path: " << request.path << std::endl;
+HttpResponse handle_admin_request(const HttpRequest& request) {
+    // Проверяем метод
+    if (request.method != "POST") {
+        return HttpResponse::error_response(405, "Method Not Allowed. Use POST for admin requests.");
+    }
     
-    // Простая маршрутизация для админов
-    if (request.method == "GET" && request.path == "/status") {
-        return create_http_response(
-            R"({"status": "success", "message": "Server is running", "clients": "active"})"
-        );
+    // Проверяем Content-Type
+    if (!request.is_json_content()) {
+        return HttpResponse::error_response(400, "Content-Type must be application/json");
     }
-    else if (request.method == "POST" && request.path == "/reload") {
-        // Заглушка для перезагрузки данных
-        return create_http_response(
-            R"({"status": "success", "message": "Data reloaded"})"
-        );
+    
+    // Проверяем наличие action в теле
+    if (request.body.find("\"action\"") == std::string::npos) {
+        return HttpResponse::error_response(400, "Invalid admin request. Include \"action\" in JSON body.");
     }
-    else {
-        return create_http_response(
-            R"({"error": "Admin endpoint not found. Try GET /status or POST /reload"})", 
-            404
-        );
-    }
+    
+    return HttpResponse::json_response(R"({"status": "success", "message": "Admin command executed"})");
 }
 
-std::string handle_client_request(const HttpRequest& request) {
-    // Обрабатываем только GET запросы для клиентов
-    if (request.method != "GET") {
-        return create_http_response(
-            R"({"error": "Method not allowed"})", 
-            405
-        );
+HttpResponse handle_client_request(const HttpRequest& request) {
+    if (request.method == "GET" && request.path == "/cars") {
+        return handle_get_cars();
     }
     
-    // Маршрутизация клиентских запросов
-    if (request.path == "/cars" || request.path == "/cars/" || request.path.find("/cars?") == 0) {
-        std::string cars_data = handle_get_cars();
-        return create_http_response(cars_data);
+    if (request.method == "GET" && request.path == "/") {
+        return HttpResponse::json_response(R"({"message": "Car Delivery Server API", "endpoints": ["GET /cars"]})");
     }
-    else if (request.path == "/" || request.path == "/health") {
-        return create_http_response(
-            R"({"status": "ok", "service": "CarDelivery API"})"
-        );
-    }
-    else {
-        return create_http_response(
-            R"({"error": "Endpoint not found. Try GET /cars"})", 
-            404
-        );
-    }
+    
+    return HttpResponse::error_response(404, "Endpoint not supported. Try GET /cars");
 }
