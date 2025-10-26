@@ -13,13 +13,25 @@ add_library(common
 )
 target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/common)
 
+# === HTTP Parser библиотека ===
+add_library(http_parser
+    server/http_parser.cpp
+)
+target_include_directories(http_parser PUBLIC ${CMAKE_SOURCE_DIR}/server)
+
 # === Сервер ===
 add_executable(server
     server/main.cpp
     server/server.cpp
     server/handlers.cpp
 )
-target_link_libraries(server common ${Boost_LIBRARIES} pthread)
+target_link_libraries(server 
+    common 
+    http_parser 
+    ${Boost_LIBRARIES} 
+    pthread
+)
+target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/server)
 
 # === Клиент ===
 add_executable(client
