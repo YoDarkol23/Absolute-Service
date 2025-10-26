@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "brand": "Toyota",
+    "model": "Camry",
+    "year": 2020,
+    "engine_liters": 2.5,
+    "in_stock": true
+  },
+  {
+    "id": 2,
+    "brand": "BMW",
+    "model": "X5",
+    "year": 2022,
+    "engine_liters": 3.0,
+    "in_stock": false
+  },
+  {
+    "id": 3,
+    "brand": "Ford",
+    "model": "Focus",
+    "year": 2019,
+    "engine_liters": 1.6,
+    "in_stock": true
+  }
+]
