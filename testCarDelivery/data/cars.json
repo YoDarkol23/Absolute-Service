@@ -23,4 +23,12 @@
     "engine_liters": 1.6,
     "in_stock": true
   }
+  {
+    "id": 4,
+    "brand": "Chevrolet",
+    "model": "Cruze",
+    "year": 2018,
+    "engine_liters": 1.4,
+    "in_stock": true
+  }
 ]
