@@ -11,3 +11,5 @@ std::string handle_get_cars();
  * Пока просто проверяет наличие "action" в теле запроса.
  */
 std::string handle_admin_request(const std::string& request);
+std::string handle_admin_request(const HttpRequest& request);
+std::string handle_client_request(const HttpRequest& request);
