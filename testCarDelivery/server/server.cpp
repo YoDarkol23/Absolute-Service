@@ -15,8 +15,10 @@
 
 #include "server.hpp"
 #include "handlers.hpp"
+#include "http_parser.hpp"
 #include <iostream>
 #include <sstream>
+#include <memory>  // Добавлено для std::shared_ptr
 
 // === Реализация пула потоков ===
 
@@ -93,8 +95,8 @@ void CarDeliveryServer::start_acceptors() {
         }
     });
 
-    client_thread.join();
-    admin_thread.join();
+    client_thread.detach();  // Исправлено: используем detach вместо join
+    admin_thread.detach();   // чтобы не блокировать основной поток
 }
 
 void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::socket> socket, bool is_admin) {
@@ -114,30 +116,37 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
             std::istreambuf_iterator<char>()
         };
 
-        std::string response_body;
+        // Парсим HTTP-запрос
+        HttpRequest http_request = HttpParser::parse_request(request);
+        
+        // Обрабатываем запрос
+        HttpResponse response;
         if (is_admin) {
-            response_body = handle_admin_request(request);
+            response = handle_admin_request(http_request);
         } else {
-            if (request.find("GET /cars") != std::string::npos) {
-                response_body = handle_get_cars();
-            } else {
-                response_body = R"({"error": "Endpoint not supported. Try GET /cars"})";
-            }
+            response = handle_client_request(http_request);
         }
 
-        std::ostringstream http_response;
-        http_response << "HTTP/1.1 200 OK\r\n"
-                      << "Content-Type: application/json\r\n"
-                      << "Content-Length: " << response_body.size() << "\r\n"
-                      << "Connection: close\r\n\r\n"
-                      << response_body;
-
-        boost::asio::write(*socket, boost::asio::buffer(http_response.str()));
-        std::cout << "[✓] Запрос от " << client_ip << " обработан успешно\n";
+        // Отправляем ответ
+        std::string http_response_str = response.to_string();
+        boost::asio::write(*socket, boost::asio::buffer(http_response_str));
+        
+        std::cout << "[✓] " << http_request.method << " " << http_request.path 
+                  << " от " << client_ip << " обработан (статус: " 
+                  << response.status_code << ")\n";
 
     } catch (std::exception& e) {
         std::cerr << "[!] Ошибка при обработке " 
                   << (is_admin ? "админ" : "клиент") 
                   << "-запроса: " << e.what() << std::endl;
+                  
+        // Отправляем ошибку клиенту
+        try {
+            HttpResponse error_response = HttpResponse::error_response(500, "Internal Server Error");
+            std::string error_str = error_response.to_string();
+            boost::asio::write(*socket, boost::asio::buffer(error_str));
+        } catch (...) {
+            // Игнорируем ошибки при отправке ошибки
+        }
     }
 }

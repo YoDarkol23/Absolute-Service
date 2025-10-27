@@ -1,13 +1,19 @@
+// handlers.hpp (обновлённый)
 #pragma once
 #include <string>
+#include "http_parser.hpp"
 
 /**
  * Обрабатывает GET /cars — возвращает список автомобилей из data/cars.json
  */
-std::string handle_get_cars();
+HttpResponse handle_get_cars();
 
 /**
  * Обрабатывает админские запросы (порт 8081).
- * Пока просто проверяет наличие "action" в теле запроса.
  */
-std::string handle_admin_request(const std::string& request);
+HttpResponse handle_admin_request(const HttpRequest& request);
+
+/**
+ * Обрабатывает клиентские запросы (порт 8080).
+ */
+HttpResponse handle_client_request(const HttpRequest& request);
