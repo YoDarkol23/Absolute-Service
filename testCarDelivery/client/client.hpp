@@ -1,12 +1,29 @@
+/**
+ * @file client/client.hpp
+ * @brief Объявления клиентских функций для взаимодействия с сервером.
+ * 
+ * Содержит:
+ * - Функции отправки HTTP-запросов на все эндпоинты API
+ * - Функции отображения меню и обработки ввода
+ * 
+ * ВАЖНО: Все функции используют общий хост и порт (по умолчанию 127.0.0.1:8080).
+ */
+
 #pragma once
 #include <string>
 
-/**
- * Получает список всех автомобилей с сервера.
- */
-std::string fetch_all_cars(const std::string& host = "127.0.0.1", int port = 8080);
+// === HTTP-запросы к серверу ===
 
-/**
- * Отправляет админ-запрос на сервер (порт 8081).
- */
-std::string send_admin_request(const std::string& host, int port, const std::string& json_body);
+std::string fetch_all_cars(const std::string& host = "127.0.0.1", int port = 8080);
+std::string fetch_cars_by_specs(const std::string& specs, const std::string& host = "127.0.0.1", int port = 8080);
+std::string fetch_cars_by_brand_model(const std::string& brand, const std::string& model, const std::string& host = "127.0.0.1", int port = 8080);
+std::string fetch_delivery_cities(const std::string& host = "127.0.0.1", int port = 8080);
+std::string fetch_required_documents(const std::string& host = "127.0.0.1", int port = 8080);
+std::string fetch_delivery_process(const std::string& host = "127.0.0.1", int port = 8080);
+std::string fetch_admin_login(const std::string& username, const std::string& password, const std::string& host = "127.0.0.1", int port = 8080);
+
+// === Интерфейс пользователя ===
+
+void display_main_menu();
+void handle_user_choice(int choice);
+void display_response(const std::string& response);

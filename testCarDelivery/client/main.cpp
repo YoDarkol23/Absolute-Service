@@ -39,32 +39,17 @@ int main(int argc, char* argv[]) {
     // Показываем пользователю, к какому серверу идёт подключение
     std::cout << "Подключение к серверу: " << server_ip << ":8080\n";
     std::cout << "==========================================\n";
-    std::cout << "   CAR DELIVERY — Клиент\n";
-    std::cout << "==========================================\n";
-    std::cout << "1. Показать все автомобили\n";
-    std::cout << "0. Выйти\n";
-    std::cout << "Ваш выбор: ";
+	std::cout << "Добро пожаловать в систему расчета доставки авто!\n";
 
-    int choice;
-    std::cin >> choice;
+	int choice;
+	do {
+		display_main_menu();
+		std::cin >> choice;
+		std::cin.ignore(); // Очищаем буфер от \n после cin
 
-    if (choice == 1) {
-        try {
-            // Вызываем функцию из client/client.cpp
-            // Передаём IP-адрес, полученный из аргумента или по умолчанию
-            std::string response = fetch_all_cars(server_ip, 8080);
+		handle_user_choice(choice);
 
-            std::cout << "\n--- Ответ от сервера ---\n";
-            std::cout << response << "\n";
-        } catch (const std::exception& e) {
-            std::cerr << "Ошибка подключения: " << e.what() << std::endl;
-            std::cerr << "Проверьте, запущен ли сервер и доступен ли IP " << server_ip << std::endl;
-        }
-    } else if (choice == 0) {
-        std::cout << "Выход из программы.\n";
-    } else {
-        std::cout << "Неизвестная команда. Выход.\n";
-    }
+	} while (choice != 0);
 
-    return 0;
+	return 0;
 }
