@@ -39,17 +39,18 @@ int main(int argc, char* argv[]) {
     // Показываем пользователю, к какому серверу идёт подключение
     std::cout << "Подключение к серверу: " << server_ip << ":8080\n";
     std::cout << "==========================================\n";
-	std::cout << "Добро пожаловать в систему расчета доставки авто!\n";
+    std::cout << "Добро пожаловать в систему расчета доставки авто!\n";
 
-	int choice;
-	do {
-		display_main_menu();
-		std::cin >> choice;
-		std::cin.ignore(); // Очищаем буфер от \n после cin
+    int choice;
+    do {
+        display_main_menu();
+        std::cin >> choice;
+        std::cin.ignore(); // Очищаем буфер от \n после cin
 
-		handle_user_choice(choice);
+        handle_user_choice(choice);
 
-	} while (choice != 0);
+    } while (choice != 0);
 
-	return 0;
+    std::cout << "Спасибо за использование нашей системы!\n";
+    return 0;
 }
