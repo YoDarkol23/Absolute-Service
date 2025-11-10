@@ -11,6 +11,8 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <algorithm>
+#include <regex>
 
 // Вспомогательная функция для парсинга query-параметров
 std::unordered_map<std::string, std::string> parse_query(const std::string& query) {
@@ -23,10 +25,52 @@ std::unordered_map<std::string, std::string> parse_query(const std::string& quer
         if (pos != std::string::npos) {
             std::string key = pair.substr(0, pos);
             std::string value = pair.substr(pos + 1);
+            // Простая URL-декодировка
+            value = std::regex_replace(value, std::regex("%20"), " ");
             params[key] = value;
         }
     }
     return params;
+}
+
+// Вспомогательная функция для парсинга JSON массива автомобилей
+std::string filter_cars_by_params(const std::string& cars_json, const std::unordered_map<std::string, std::string>& params) {
+    // Простая фильтрация по бренду (для демонстрации)
+    if (params.count("brand")) {
+        std::string brand = params.at("brand");
+        std::transform(brand.begin(), brand.end(), brand.begin(), ::tolower);
+        
+        // Ищем автомобили с указанным брендом
+        std::stringstream result;
+        result << "[";
+        bool first = true;
+        
+        // Простой поиск по подстроке (для демо)
+        size_t pos = 0;
+        while ((pos = cars_json.find("\"brand\"", pos)) != std::string::npos) {
+            size_t start = cars_json.find('"', pos + 7) + 1;
+            size_t end = cars_json.find('"', start);
+            std::string car_brand = cars_json.substr(start, end - start);
+            std::transform(car_brand.begin(), car_brand.end(), car_brand.begin(), ::tolower);
+            
+            if (car_brand.find(brand) != std::string::npos) {
+                // Находим начало и конец объекта
+                size_t obj_start = cars_json.rfind('{', pos);
+                size_t obj_end = cars_json.find("},", pos) + 1;
+                if (obj_end == std::string::npos) obj_end = cars_json.find(']', pos);
+                
+                if (!first) result << ",";
+                result << cars_json.substr(obj_start, obj_end - obj_start);
+                first = false;
+            }
+            pos = end;
+        }
+        result << "]";
+        
+        return result.str();
+    }
+    
+    return cars_json;
 }
 
 std::string handle_get_cars() {
@@ -52,7 +96,7 @@ std::string handle_get_cities() {
     std::string content = read_file("data/cities.json");
     
     if (content.empty() || content.find("error") != std::string::npos) {
-        return R"([{"id": 1, "name": "Москва"}, {"id": 2, "name": "Санкт-Петербург"}, {"id": 3, "name": "Новосибирск"}])";
+        return R"([{"id": 1, "name": "Москва", "delivery_time": "30 дней", "cost": "1000 USD"}, {"id": 2, "name": "Санкт-Петербург", "delivery_time": "35 дней", "cost": "1200 USD"}, {"id": 3, "name": "Новосибирск", "delivery_time": "45 дней", "cost": "1500 USD"}])";
     }
     
     return content;
@@ -85,11 +129,12 @@ std::string handle_get_delivery() {
 
 std::string handle_post_admin_login(const std::string& body) {
     if (body.find("\"username\"") != std::string::npos && body.find("\"password\"") != std::string::npos) {
+        // Простая проверка - любой пароль с admin работает
         if (body.find("admin") != std::string::npos) {
             return R"({"status": "success", "message": "Admin login successful", "token": "demo_token_12345"})";
         }
     }
-    return R"({"error": "Invalid admin credentials"})";
+    return R"({"error": "Invalid admin credentials. Use username: admin, password: admin"})";
 }
 
 std::string handle_get_cars_specs(const std::string& query_string) {
@@ -106,17 +151,18 @@ std::string handle_get_cars_specs(const std::string& query_string) {
 
 std::string handle_get_cars_brand(const std::string& query_string) {
     auto params = parse_query(query_string);
-    std::string brand = params.count("brand") ? params["brand"] : "";
-    std::string model = params.count("model") ? params["model"] : "";
     
-    std::string response = R"({
-        "message": "Search by brand and model",
-        "brand": ")" + brand + R"(",
-        "model": ")" + model + R"(",
-        "results": []
-    })";
+    // Загружаем все автомобили
+    std::string all_cars = read_file("data/cars.json");
     
-    return response;
+    if (all_cars.empty() || all_cars.find("error") != std::string::npos) {
+        return R"({"error": "Cannot load cars data"})";
+    }
+    
+    // Фильтруем по параметрам
+    std::string filtered_cars = filter_cars_by_params(all_cars, params);
+    
+    return filtered_cars;
 }
 
 std::string handle_get_delivery_cities() {
