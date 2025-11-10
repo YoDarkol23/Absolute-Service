@@ -2,13 +2,28 @@
 #include "../common/utils.hpp"
 #include <iostream>
 #include <string>
+#include <sstream>
+
+// Вспомогательная функция для извлечения JSON из HTTP-ответа
+std::string extract_json_from_response(const std::string& http_response) {
+    // Ищем начало тела ответа (после \r\n\r\n)
+    size_t body_start = http_response.find("\r\n\r\n");
+    if (body_start != std::string::npos) {
+        return http_response.substr(body_start + 4);
+    }
+    
+    // Если нет двойного перевода строки, ищем просто после заголовков
+    body_start = http_response.find("\n\n");
+    if (body_start != std::string::npos) {
+        return http_response.substr(body_start + 2);
+    }
+    
+    // Если не нашли разделитель, возвращаем как есть
+    return http_response;
+}
 
 /**
  * Отправляет запрос на получение списка всех автомобилей.
- * 
- * @param host — адрес сервера (например, "127.0.0.1")
- * @param port — порт сервера (обычно 8080)
- * @return JSON-строка с данными или ошибкой
  */
 std::string fetch_all_cars(const std::string& host, int port) {
     std::string request = 
@@ -17,7 +32,8 @@ std::string fetch_all_cars(const std::string& host, int port) {
         "Connection: close\r\n"
         "\r\n";
 
-    return send_http_request(host, port, request);
+    std::string response = send_http_request(host, port, request);
+    return extract_json_from_response(response);
 }
 
 /**
@@ -30,7 +46,8 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
         "Connection: close\r\n"
         "\r\n";
 
-    return send_http_request(host, port, request);
+    std::string response = send_http_request(host, port, request);
+    return extract_json_from_response(response);
 }
 
 /**
@@ -48,7 +65,8 @@ std::string fetch_cars_by_brand_model(const std::string& brand, const std::strin
         "Connection: close\r\n"
         "\r\n";
 
-    return send_http_request(host, port, request);
+    std::string response = send_http_request(host, port, request);
+    return extract_json_from_response(response);
 }
 
 /**
@@ -61,7 +79,8 @@ std::string fetch_delivery_cities(const std::string& host, int port) {
         "Connection: close\r\n"
         "\r\n";
 
-    return send_http_request(host, port, request);
+    std::string response = send_http_request(host, port, request);
+    return extract_json_from_response(response);
 }
 
 /**
@@ -74,7 +93,8 @@ std::string fetch_required_documents(const std::string& host, int port) {
         "Connection: close\r\n"
         "\r\n";
 
-    return send_http_request(host, port, request);
+    std::string response = send_http_request(host, port, request);
+    return extract_json_from_response(response);
 }
 
 /**
@@ -87,7 +107,8 @@ std::string fetch_delivery_process(const std::string& host, int port) {
         "Connection: close\r\n"
         "\r\n";
 
-    return send_http_request(host, port, request);
+    std::string response = send_http_request(host, port, request);
+    return extract_json_from_response(response);
 }
 
 /**
@@ -104,7 +125,8 @@ std::string fetch_admin_login(const std::string& username, const std::string& pa
         "Connection: close\r\n"
         "\r\n" + body;
 
-    return send_http_request(host, port, request);
+    std::string response = send_http_request(host, port, request);
+    return extract_json_from_response(response);
 }
 
 // === Реализации функций интерфейса ===
@@ -144,7 +166,7 @@ void handle_user_choice(int choice) {
         case 2: {
             std::cout << "\n--- Поиск по характеристикам ---\n";
             std::string specs;
-            std::cout << "Введите характеристики (например: year=2023&price_max=50000): ";
+            std::cout << "Введите характеристики (например: year=2020&fuel_type=petrol): ";
             std::getline(std::cin, specs);
             response = fetch_cars_by_specs(specs, host, port);
             display_response(response);
@@ -208,6 +230,37 @@ void handle_user_choice(int choice) {
  */
 void display_response(const std::string& response) {
     std::cout << "\n--- Ответ сервера ---\n";
-    std::cout << response << std::endl;
-    std::cout << "----------------------\n";
+    
+    // Пытаемся красиво отформатировать JSON
+    int indent = 0;
+    bool in_string = false;
+    
+    for (char c : response) {
+        if (c == '\"') in_string = !in_string;
+        
+        if (!in_string) {
+            if (c == '{' || c == '[') {
+                std::cout << c << '\n';
+                indent += 2;
+                std::cout << std::string(indent, ' ');
+                continue;
+            } else if (c == '}' || c == ']') {
+                std::cout << '\n';
+                indent -= 2;
+                std::cout << std::string(indent, ' ') << c;
+                continue;
+            } else if (c == ',') {
+                std::cout << c << '\n';
+                std::cout << std::string(indent, ' ');
+                continue;
+            } else if (c == ':') {
+                std::cout << c << ' ';
+                continue;
+            }
+        }
+        
+        std::cout << c;
+    }
+    
+    std::cout << "\n----------------------\n";
 }
