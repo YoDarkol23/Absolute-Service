@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <boost/asio.hpp>
+#include <iostream>
 
 // Реализация чтения файла
 std::string read_file(const std::string& path) {
@@ -17,29 +18,41 @@ std::string read_file(const std::string& path) {
     );
 }
 
-// Реализация отправки HTTP-запроса
+// Реализация отправки HTTP-запроса (ИСПРАВЛЕННАЯ)
 std::string send_http_request(const std::string& host, int port, const std::string& request) {
-    using boost::asio::ip::tcp;
-    boost::asio::io_context io_context;
+    try {
+        using boost::asio::ip::tcp;
+        boost::asio::io_context io_context;
 
-    // Находим IP по имени хоста
-    tcp::resolver resolver(io_context);
-    tcp::socket socket(io_context);
-    auto endpoint = resolver.resolve(host, std::to_string(port));
-    boost::asio::connect(socket, endpoint);
+        // Находим IP по имени хоста
+        tcp::resolver resolver(io_context);
+        tcp::socket socket(io_context);
+        auto endpoints = resolver.resolve(host, std::to_string(port));
+        boost::asio::connect(socket, endpoints);
 
-    // Отправляем запрос
-    boost::asio::write(socket, boost::asio::buffer(request));
+        // Отправляем запрос
+        boost::asio::write(socket, boost::asio::buffer(request));
 
-    // Читаем ответ (заголовки + тело)
-    boost::asio::streambuf response_buffer;
-    boost::system::error_code ec;
-
-    // Читаем до конца (для маленьких ответов — нормально)
-    while (boost::asio::read(socket, response_buffer, boost::asio::transfer_at_least(1), ec));
-    
-    return std::string(
-        std::istreambuf_iterator<char>(&response_buffer),
-        std::istreambuf_iterator<char>()
-    );
+        // Читаем ответ
+        boost::asio::streambuf response_buffer;
+        boost::system::error_code ec;
+        
+        // Читаем до конца соединения
+        while (boost::asio::read(socket, response_buffer, 
+                                boost::asio::transfer_at_least(1), ec)) {
+            if (ec) break;
+        }
+        
+        // Если ошибка - не break, а end of file - это нормально
+        if (ec != boost::asio::error::eof) {
+            throw boost::system::system_error(ec);
+        }
+        
+        std::string response = boost::asio::buffer_cast<const char*>(response_buffer.data());
+        return response;
+        
+    } catch (std::exception& e) {
+        std::cerr << "❌ Ошибка HTTP-запроса: " << e.what() << std::endl;
+        return "HTTP/1.1 500 Internal Server Error\r\n\r\nError: " + std::string(e.what());
+    }
 }
