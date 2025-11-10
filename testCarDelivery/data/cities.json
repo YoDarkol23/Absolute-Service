@@ -2,6 +2,11 @@
     {"id": 1, "name": "Москва", "delivery_time": "30 дней", "cost": "1000 USD"},
     {"id": 2, "name": "Санкт-Петербург", "delivery_time": "35 дней", "cost": "1200 USD"},
     {"id": 3, "name": "Новосибирск", "delivery_time": "45 дней", "cost": "1500 USD"},
-    {"id": 4, "name": "Владивосток", "delivery_time": "25 дней", "cost": "800 USD"},
-    {"id": 5, "name": "Екатеринбург", "delivery_time": "40 дней", "cost": "1300 USD"}
+    {"id": 4, "name": "Екатеринбург", "delivery_time": "40 дней", "cost": "1300 USD"},
+    {"id": 5, "name": "Нижний Новгород", "delivery_time": "35 дней", "cost": "1200 USD"},
+    {"id": 6, "name": "Казань", "delivery_time": "38 дней", "cost": "1250 USD"},
+    {"id": 7, "name": "Челябинск", "delivery_time": "42 дней", "cost": "1400 USD"},
+    {"id": 8, "name": "Омск", "delivery_time": "44 дней", "cost": "1450 USD"},
+    {"id": 9, "name": "Самара", "delivery_time": "37 дней", "cost": "1250 USD"},
+    {"id": 10, "name": "Ростов-на-Дону", "delivery_time": "39 дней", "cost": "1350 USD"}
 ]
