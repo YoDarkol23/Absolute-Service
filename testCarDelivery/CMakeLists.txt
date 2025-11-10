@@ -4,7 +4,7 @@ project(car_delivery CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Ищем установленный nlohmann_json
+# Поиск nlohmann_json
 find_package(nlohmann_json 3.11.2 REQUIRED)
 
 find_package(Boost REQUIRED COMPONENTS system)
@@ -36,4 +36,4 @@ target_link_libraries(client common ${Boost_LIBRARIES} pthread)
 # Копируем данные
 file(COPY data/ DESTINATION ${CMAKE_BINARY_DIR}/data)
 
-message("✅ Проект настроен с системным nlohmann_json")
+message("✅ Проект настроен")
