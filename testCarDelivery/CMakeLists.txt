@@ -4,14 +4,8 @@ project(car_delivery CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Загрузка nlohmann/json
-include(FetchContent)
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.2
-)
-FetchContent_MakeAvailable(nlohmann_json)
+# Ищем установленный nlohmann_json
+find_package(nlohmann_json 3.11.2 REQUIRED)
 
 find_package(Boost REQUIRED COMPONENTS system)
 
@@ -29,7 +23,7 @@ add_executable(server
     server/handlers.cpp
 )
 target_include_directories(server PUBLIC ${CMAKE_SOURCE_DIR}/server ${CMAKE_SOURCE_DIR}/common)
-target_link_libraries(server common nlohmann_json::nlohmann_json ${Boost_LIBRARIES} pthread)
+target_link_libraries(server common ${Boost_LIBRARIES} pthread)
 
 # Клиент
 add_executable(client
@@ -37,9 +31,9 @@ add_executable(client
     client/client.cpp
 )
 target_include_directories(client PUBLIC ${CMAKE_SOURCE_DIR}/client ${CMAKE_SOURCE_DIR}/common)
-target_link_libraries(client common nlohmann_json::nlohmann_json ${Boost_LIBRARIES} pthread)
+target_link_libraries(client common ${Boost_LIBRARIES} pthread)
 
 # Копируем данные
 file(COPY data/ DESTINATION ${CMAKE_BINARY_DIR}/data)
 
-message("✅ Проект настроен с nlohmann/json")
+message("✅ Проект настроен с системным nlohmann_json")
