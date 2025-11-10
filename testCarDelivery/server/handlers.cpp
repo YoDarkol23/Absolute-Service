@@ -10,7 +10,7 @@
 #include "../common/utils.hpp"
 #include <iostream>
 #include <sstream>
-#include <algorithm>
+#include <unordered_map>
 
 // Вспомогательная функция для парсинга query-параметров
 std::unordered_map<std::string, std::string> parse_query(const std::string& query) {
@@ -23,7 +23,6 @@ std::unordered_map<std::string, std::string> parse_query(const std::string& quer
         if (pos != std::string::npos) {
             std::string key = pair.substr(0, pos);
             std::string value = pair.substr(pos + 1);
-            // Декодирование URL (базовое)
             params[key] = value;
         }
     }
@@ -42,21 +41,17 @@ std::string handle_get_cars() {
 }
 
 std::string handle_post_search(const std::string& body) {
-    // Заглушка для POST поиска
     return R"({"message": "POST search functionality coming soon", "results": []})";
 }
 
 std::string handle_get_search(const std::string& query_string) {
-    // Заглушка для GET поиска
     return R"({"message": "GET search functionality coming soon", "results": []})";
 }
 
 std::string handle_get_cities() {
-    // Читаем файл с городами или возвращаем заглушку
     std::string content = read_file("data/cities.json");
     
     if (content.empty() || content.find("error") != std::string::npos) {
-        // Возвращаем заглушку, если файла нет
         return R"([{"id": 1, "name": "Москва"}, {"id": 2, "name": "Санкт-Петербург"}, {"id": 3, "name": "Новосибирск"}])";
     }
     
@@ -75,7 +70,6 @@ std::string handle_get_documents() {
 }
 
 std::string handle_get_delivery() {
-    // Информация о процессе доставки
     return R"({
         "process": [
             {"step": 1, "description": "Выбор автомобиля и заключение договора"},
@@ -90,9 +84,7 @@ std::string handle_get_delivery() {
 }
 
 std::string handle_post_admin_login(const std::string& body) {
-    // Простая проверка логина/пароля
     if (body.find("\"username\"") != std::string::npos && body.find("\"password\"") != std::string::npos) {
-        // Проверяем наличие admin/admin (для демо)
         if (body.find("admin") != std::string::npos) {
             return R"({"status": "success", "message": "Admin login successful", "token": "demo_token_12345"})";
         }
@@ -100,11 +92,9 @@ std::string handle_post_admin_login(const std::string& body) {
     return R"({"error": "Invalid admin credentials"})";
 }
 
-// Новые обработчики для дополнительных эндпоинтов клиента
 std::string handle_get_cars_specs(const std::string& query_string) {
     auto params = parse_query(query_string);
     
-    // Здесь должна быть логика фильтрации по характеристикам
     std::string response = R"({
         "message": "Search by specifications",
         "filters_applied": )" + std::to_string(params.size()) + R"(,
@@ -130,9 +120,9 @@ std::string handle_get_cars_brand(const std::string& query_string) {
 }
 
 std::string handle_get_delivery_cities() {
-    return handle_get_cities(); // Используем тот же обработчик
+    return handle_get_cities();
 }
 
 std::string handle_get_delivery_process() {
-    return handle_get_delivery(); // Используем тот же обработчик
+    return handle_get_delivery();
 }

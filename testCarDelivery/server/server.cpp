@@ -119,7 +119,7 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         }
 
         std::string response_body;
-        if (request.find("GET /cars") != std::string::npos) {
+        if (request.find("GET /cars") != std::string::npos && request.find("?") == std::string::npos) {
             response_body = handle_get_cars();
         }
         else if (request.find("POST /search") != std::string::npos) {
@@ -140,8 +140,26 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         else if (request.find("GET /documents") != std::string::npos) {
             response_body = handle_get_documents();
         }
-        else if (request.find("GET /delivery") != std::string::npos) {
+        else if (request.find("GET /delivery") != std::string::npos && request.find("/delivery/") == std::string::npos) {
             response_body = handle_get_delivery();
+        }
+        else if (request.find("GET /cars/specs?") != std::string::npos) {
+            size_t s = request.find('?'), e = request.find(' ', s);
+            response_body = (s != std::string::npos && e != std::string::npos)
+                ? handle_get_cars_specs(request.substr(s + 1, e - s - 1))
+                : R"({"error": "Invalid query in GET /cars/specs"})";
+        }
+        else if (request.find("GET /cars/brand?") != std::string::npos) {
+            size_t s = request.find('?'), e = request.find(' ', s);
+            response_body = (s != std::string::npos && e != std::string::npos)
+                ? handle_get_cars_brand(request.substr(s + 1, e - s - 1))
+                : R"({"error": "Invalid query in GET /cars/brand"})";
+        }
+        else if (request.find("GET /delivery/cities") != std::string::npos) {
+            response_body = handle_get_delivery_cities();
+        }
+        else if (request.find("GET /delivery/process") != std::string::npos) {
+            response_body = handle_get_delivery_process();
         }
         else {
             response_body = R"({"error": "Endpoint not supported"})";
