@@ -107,21 +107,6 @@ std::string fetch_admin_login(const std::string& username, const std::string& pa
     return send_http_request(host, port, request);
 }
 
-/**
- * Отправляет админ-запрос (например, для добавления авто).
- */
-std::string send_admin_request(const std::string& host, int port, const std::string& json_body) {
-    std::string request = 
-        "POST /admin/update HTTP/1.1\r\n"
-        "Host: " + host + "\r\n"
-        "Content-Type: application/json\r\n"
-        "Content-Length: " + std::to_string(json_body.size()) + "\r\n"
-        "Connection: close\r\n"
-        "\r\n" + json_body;
-
-    return send_http_request(host, port, request);
-}
-
 // === Реализации функций интерфейса ===
 
 /**
@@ -203,7 +188,7 @@ void handle_user_choice(int choice) {
             std::getline(std::cin, username);
             std::cout << "Пароль: ";
             std::getline(std::cin, password);
-            response = fetch_admin_login(username, password, host, port);
+            response = fetch_admin_login(username, password, host, 8081); // Админ порт 8081
             display_response(response);
             break;
         }
