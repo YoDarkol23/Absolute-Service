@@ -4,29 +4,26 @@
 #include <boost/asio.hpp>
 #include <iostream>
 
-// Реализация чтения файла
 std::string read_file(const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
-        // Если файл не найден — возвращаем JSON с ошибкой
-        return R"([{"error": "File not found: )" + path + "\"}]";
+        std::cerr << "❌ Ошибка открытия файла: " << path << std::endl;
+        return ""; // Возвращаем пустую строку вместо JSON с ошибкой
     }
-    // Читаем всё содержимое файла в строку
-    return std::string(
-        std::istreambuf_iterator<char>(file),
-        std::istreambuf_iterator<char>()
-    );
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
 }
 
-// Реализация отправки HTTP-запроса (ИСПРАВЛЕННАЯ)
 std::string send_http_request(const std::string& host, int port, const std::string& request) {
     try {
         using boost::asio::ip::tcp;
         boost::asio::io_context io_context;
 
-        // Находим IP по имени хоста
         tcp::resolver resolver(io_context);
         tcp::socket socket(io_context);
+        
         auto endpoints = resolver.resolve(host, std::to_string(port));
         boost::asio::connect(socket, endpoints);
 
@@ -34,25 +31,28 @@ std::string send_http_request(const std::string& host, int port, const std::stri
         boost::asio::write(socket, boost::asio::buffer(request));
 
         // Читаем ответ
-        boost::asio::streambuf response_buffer;
+        boost::asio::streambuf response;
         boost::system::error_code ec;
         
-        // Читаем до конца соединения
-        while (boost::asio::read(socket, response_buffer, 
-                                boost::asio::transfer_at_least(1), ec)) {
-            if (ec) break;
+        // Читаем все данные
+        while (boost::asio::read(socket, response, boost::asio::transfer_at_least(1), ec)) {
+            // Продолжаем читать
         }
         
-        // Если ошибка - не break, а end of file - это нормально
-        if (ec != boost::asio::error::eof) {
+        // Если ошибка - не EOF, то это проблема
+        if (ec && ec != boost::asio::error::eof) {
             throw boost::system::system_error(ec);
         }
         
-        std::string response = boost::asio::buffer_cast<const char*>(response_buffer.data());
-        return response;
+        // Преобразуем буфер в строку
+        std::istream response_stream(&response);
+        std::stringstream ss;
+        ss << response_stream.rdbuf();
+        
+        return ss.str();
         
     } catch (std::exception& e) {
-        std::cerr << "❌ Ошибка HTTP-запроса: " << e.what() << std::endl;
-        return "HTTP/1.1 500 Internal Server Error\r\n\r\nError: " + std::string(e.what());
+        std::cerr << "❌ Ошибка HTTP-запроса к " << host << ":" << port << ": " << e.what() << std::endl;
+        return R"({"error": "Ошибка подключения к серверу"})";
     }
 }
