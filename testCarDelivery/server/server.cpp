@@ -1,25 +1,24 @@
 /**
  * @file server/server.cpp
- * @brief Реализация сервера CarDelivery.
+ * @brief Реализация сервера testCarDelivery.
  * 
- * Содержит:
- * - Реализацию пула потоков (ThreadPool)
- * - Логику приёма подключений на двух портах:
- *     • 8080 — обычные клиенты
- *     • 8081 — администраторы (приоритетная обработка)
- * - Обработку HTTP-запросов и маршрутизацию к обработчикам
+ * Обрабатывает все запросы на одном порту (8080).
+ * Поддерживает:
+ *   - GET /cars, /cities, /documents, /delivery
+ *   - GET /search?brand=...&model=...
+ *   - POST /search (JSON body)
+ *   - POST /admin/login (аутентификация)
  * 
- * ВАЖНО: Вся бизнес-логика (расчёт, фильтрация) находится в handlers.cpp.
- * Здесь только сетевая часть и многопоточность.
+ * Использует пул потоков для многопоточности.
  */
 
 #include "server.hpp"
 #include "handlers.hpp"
 #include <iostream>
 #include <sstream>
+#include <string>
 
-// === Реализация пула потоков ===
-
+// === ThreadPool ===
 ThreadPool::ThreadPool(size_t threads) : stop(false) {
     for (size_t i = 0; i < threads; ++i) {
         workers.emplace_back([this] {
@@ -54,90 +53,98 @@ ThreadPool::~ThreadPool() {
     }
     condition.notify_all();
     for (std::thread &worker : workers) {
-        if (worker.joinable()) {
-            worker.join();
-        }
+        if (worker.joinable()) worker.join();
     }
 }
 
 template void ThreadPool::enqueue<std::function<void()>>(std::function<void()>&&);
 
-// === Реализация сервера ===
-
-CarDeliveryServer::CarDeliveryServer(unsigned short client_port, unsigned short admin_port)
-    : client_acceptor_(io_context_, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), client_port)),
-      admin_acceptor_(io_context_, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), admin_port)) {}
+// === CarDeliveryServer ===
+CarDeliveryServer::CarDeliveryServer(unsigned short port)
+    : acceptor_(io_context_, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port)) {}
 
 void CarDeliveryServer::run() {
-    start_acceptors();
+    std::cout << "🚀 Сервер запущен на порту 8080\n";
+    std::cout << "Ожидание подключений...\n";
+
+    while (true) {
+        auto socket = std::make_shared<boost::asio::ip::tcp::socket>(io_context_);
+        acceptor_.accept(*socket);
+        client_pool_.enqueue([this, socket]() {
+            handle_client(socket);
+        });
+    }
 }
 
-void CarDeliveryServer::start_acceptors() {
-    std::thread client_thread([this]() {
-        while (true) {
-            auto socket = std::make_shared<boost::asio::ip::tcp::socket>(io_context_);
-            client_acceptor_.accept(*socket);
-            client_pool_.enqueue([this, socket]() {
-                handle_client(socket, false);
-            });
-        }
-    });
-
-    std::thread admin_thread([this]() {
-        while (true) {
-            auto socket = std::make_shared<boost::asio::ip::tcp::socket>(io_context_);
-            admin_acceptor_.accept(*socket);
-            admin_pool_.enqueue([this, socket]() {
-                handle_client(socket, true);
-            });
-        }
-    });
-
-    client_thread.join();
-    admin_thread.join();
-}
-
-void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::socket> socket, bool is_admin) {
+void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::socket> socket) {
     try {
         auto remote_ep = socket->remote_endpoint();
         std::string client_ip = remote_ep.address().to_string();
-
-        std::cout << "[+] Новое " << (is_admin ? "АДМИН" : "КЛИЕНТ") 
-                  << "-подключение от " << client_ip << std::endl;
+        std::cout << "[+] Новое подключение от " << client_ip << std::endl;
 
         boost::asio::streambuf buffer;
         boost::asio::read_until(*socket, buffer, "\r\n\r\n");
-
-        // ИСПРАВЛЕНО: uniform initialization {}
         std::string request{
             std::istreambuf_iterator<char>(&buffer),
             std::istreambuf_iterator<char>()
         };
 
-        std::string response_body;
-        if (is_admin) {
-            response_body = handle_admin_request(request);
-        } else {
-            if (request.find("GET /cars") != std::string::npos) {
-                response_body = handle_get_cars();
-            } else {
-                response_body = R"({"error": "Endpoint not supported. Try GET /cars"})";
+        // Чтение тела, если Content-Length > 0
+        size_t cl_pos = request.find("Content-Length: ");
+        if (cl_pos != std::string::npos) {
+            size_t end = request.find("\r\n", cl_pos);
+            int len = std::stoi(request.substr(cl_pos + 16, end - cl_pos - 16));
+            if (len > 0) {
+                std::vector<char> body(len);
+                boost::asio::read(*socket, boost::asio::buffer(body));
+                request += std::string(body.begin(), body.end());
             }
         }
 
-        std::ostringstream http_response;
-        http_response << "HTTP/1.1 200 OK\r\n"
-                      << "Content-Type: application/json\r\n"
-                      << "Content-Length: " << response_body.size() << "\r\n"
-                      << "Connection: close\r\n\r\n"
-                      << response_body;
+        std::string response_body;
+        if (request.find("GET /cars") != std::string::npos) {
+            response_body = handle_get_cars();
+        }
+        else if (request.find("POST /search") != std::string::npos) {
+            size_t b = request.find("\r\n\r\n");
+            response_body = (b != std::string::npos)
+                ? handle_post_search(request.substr(b + 4))
+                : R"({"error": "No body in POST /search"})";
+        }
+        else if (request.find("GET /search?") != std::string::npos) {
+            size_t s = request.find('?'), e = request.find(' ', s);
+            response_body = (s != std::string::npos && e != std::string::npos)
+                ? handle_get_search(request.substr(s + 1, e - s - 1))
+                : R"({"error": "Invalid query in GET /search"})";
+        }
+        else if (request.find("GET /cities") != std::string::npos) {
+            response_body = handle_get_cities();
+        }
+        else if (request.find("GET /documents") != std::string::npos) {
+            response_body = handle_get_documents();
+        }
+        else if (request.find("GET /delivery") != std::string::npos) {
+            response_body = handle_get_delivery();
+        }
+        else if (request.find("POST /admin/login") != std::string::npos) {
+            size_t b = request.find("\r\n\r\n");
+            response_body = (b != std::string::npos)
+                ? handle_post_admin_login(request.substr(b + 4))
+                : R"({"error": "No body in POST /admin/login"})";
+        }
+        else {
+            response_body = R"({"error": "Endpoint not supported"})";
+        }
 
-        boost::asio::write(*socket, boost::asio::buffer(http_response.str()));
-        std::cout << "[✓] Запрос от " << client_ip << " обработан успешно\n";
-
+        std::ostringstream resp;
+        resp << "HTTP/1.1 200 OK\r\n"
+             << "Content-Type: application/json\r\n"
+             << "Content-Length: " << response_body.size() << "\r\n"
+             << "Connection: close\r\n\r\n"
+             << response_body;
+        boost::asio::write(*socket, boost::asio::buffer(resp.str()));
+        std::cout << "[✓] Запрос от " << client_ip << " обработан\n";
     } catch (std::exception& e) {
-        std::cerr << "[!] Ошибка при обработке " 
-                  << (is_admin ? "админ" : "клиент") 
-                  << "-запроса: " << e.what() << std::endl;
+        std::cerr << "[!] Ошибка: " << e.what() << std::endl;
     }
 }
