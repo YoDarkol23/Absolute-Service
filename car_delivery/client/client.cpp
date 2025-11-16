@@ -31,16 +31,14 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
         json filters = json::object();
         std::istringstream iss(specs);
         std::string pair;
-
         while (std::getline(iss, pair, ',')) {
             size_t pos = pair.find('=');
             if (pos != std::string::npos) {
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
-                filters[key] = value;  // Просто передаем как строку
+                filters[key] = value;
             }
         }
-
         json request_body = { {"filters", filters} };
         std::string body = request_body.dump();
         std::string request =
