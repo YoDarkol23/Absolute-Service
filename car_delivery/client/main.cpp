@@ -35,7 +35,7 @@ int main() {
                 break;
 
             case 2: {
-                std::cout << "\nEnter search filters (e.g., brand=Toyota,year=2020): ";
+                std::cout << "\nEnter search filters (e.g., brand=Toyota,year=2020,horsepower=150): ";
                 std::string specs;
                 std::getline(std::cin, specs);
                 response = fetch_cars_by_specs(specs, host, client_port);

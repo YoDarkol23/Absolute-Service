@@ -34,9 +34,37 @@ std::string handle_post_search(const std::string& body) {
         for (const auto& car : cars) {
             bool match = true;
             for (auto& [key, value] : filters.items()) {
-                if (!car.contains(key) || car[key] != value) {
+                if (!car.contains(key)) {
                     match = false;
                     break;
+                }
+
+                // Сравнение значений с учетом типов
+                if (value.is_string()) {
+                    // Строковое сравнение (регистронезависимое)
+                    std::string car_value = car[key].get<std::string>();
+                    std::string filter_value = value.get<std::string>();
+                    std::transform(car_value.begin(), car_value.end(), car_value.begin(), ::tolower);
+                    std::transform(filter_value.begin(), filter_value.end(), filter_value.begin(), ::tolower);
+
+                    if (car_value != filter_value) {
+                        match = false;
+                        break;
+                    }
+                }
+                else if (value.is_number()) {
+                    // Числовое сравнение
+                    if (car[key].get<double>() != value.get<double>()) {
+                        match = false;
+                        break;
+                    }
+                }
+                else {
+                    // Другие типы
+                    if (car[key] != value) {
+                        match = false;
+                        break;
+                    }
                 }
             }
             if (match) {
@@ -49,35 +77,90 @@ std::string handle_post_search(const std::string& body) {
         if (!results.empty()) {
             response["results"] = results;
         }
+        else {
+            response["message"] = "No vehicles found matching the specified criteria";
+        }
         return response.dump();
-    } catch (...) {
+    }
+    catch (...) {
         return R"({"error": "Invalid search request format"})";
     }
 }
 
 // GET /search?brand=...&model=...
 std::string handle_get_search(const std::string& query_string) {
-    // Простой парсинг query_string: brand=Toyota&model=Camry
+    // Парсинг query_string: brand=Toyota&model=Camry&horsepower=150
     json filters;
     std::istringstream iss(query_string);
     std::string param;
+
     while (std::getline(iss, param, '&')) {
         size_t eq = param.find('=');
         if (eq != std::string::npos) {
             std::string key = param.substr(0, eq);
             std::string value = param.substr(eq + 1);
-            filters[key] = value;
+
+            // Преобразование числовых значений
+            if (key == "year" || key == "price_usd" || key == "horsepower" || key == "engine_volume") {
+                try {
+                    if (value.find('.') != std::string::npos) {
+                        // Дробное число (engine_volume)
+                        filters[key] = std::stod(value);
+                    }
+                    else {
+                        // Целое число
+                        filters[key] = std::stoi(value);
+                    }
+                }
+                catch (...) {
+                    // Если не удалось преобразовать, оставляем строкой
+                    filters[key] = value;
+                }
+            }
+            else {
+                // Строковые значения
+                filters[key] = value;
+            }
         }
     }
 
     json cars = load_cars_db();
     json results = json::array();
+
     for (const auto& car : cars) {
         bool match = true;
         for (auto& [key, value] : filters.items()) {
-            if (!car.contains(key) || car[key] != value) {
+            if (!car.contains(key)) {
                 match = false;
                 break;
+            }
+
+            // Сравнение значений с учетом типов
+            if (value.is_string()) {
+                // Строковое сравнение (регистронезависимое)
+                std::string car_value = car[key].get<std::string>();
+                std::string filter_value = value.get<std::string>();
+                std::transform(car_value.begin(), car_value.end(), car_value.begin(), ::tolower);
+                std::transform(filter_value.begin(), filter_value.end(), filter_value.begin(), ::tolower);
+
+                if (car_value != filter_value) {
+                    match = false;
+                    break;
+                }
+            }
+            else if (value.is_number()) {
+                // Числовое сравнение
+                if (car[key].get<double>() != value.get<double>()) {
+                    match = false;
+                    break;
+                }
+            }
+            else {
+                // Другие типы
+                if (car[key] != value) {
+                    match = false;
+                    break;
+                }
             }
         }
         if (match) {
@@ -89,6 +172,9 @@ std::string handle_get_search(const std::string& query_string) {
     response["found"] = results.size();
     if (!results.empty()) {
         response["results"] = results;
+    }
+    else {
+        response["message"] = "No vehicles found matching the specified criteria";
     }
     return response.dump();
 }
