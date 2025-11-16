@@ -137,6 +137,14 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         // Обработка запросов
         std::string response_body;
 
+        // Отладочный вывод
+        std::cout << "=== RAW REQUEST ===" << std::endl;
+        std::cout << request << std::endl;
+        std::cout << "=== END REQUEST ===" << std::endl;
+
+        if (request.find("GET /cars") == 0) {
+            response_body = handle_get_cars();
+        }
         else if (request.find("POST /search") == 0) {
             size_t body_start = request.find("\r\n\r\n");
             if (body_start != std::string::npos) {
@@ -146,10 +154,6 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
             else {
                 response_body = R"({"error": "No body in POST /search"})";
             }
-        }
-        // ... остальные обработчики остаются без изменений
-        else if (request.find("GET /cars") == 0) {
-            response_body = handle_get_cars();
         }
         else if (request.find("GET /search?") == 0) {
             size_t s = request.find('?'), e = request.find(' ', s);
