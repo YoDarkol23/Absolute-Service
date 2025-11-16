@@ -48,7 +48,7 @@ std::string handle_post_search(const std::string& body) {
                     break;
                 }
 
-                // Простое сравнение значений
+                // Простое сравнение значений (только равно)
                 if (car[key] != value) {
                     match = false;
                     break;

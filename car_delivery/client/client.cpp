@@ -38,27 +38,27 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
             size_t pos = pair.find('=');
             if (pos != std::string::npos) {
                 std::string key = pair.substr(0, pos);
-                std::string value = pair.substr(pos + 1);
+                std::string value_str = pair.substr(pos + 1);
 
-                // Преобразуем числовые значения
+                // Преобразуем значение в правильный тип
                 if (key == "year" || key == "horsepower" || key == "price_usd") {
                     try {
-                        filters[key] = std::stoi(value);
+                        filters[key] = std::stoi(value_str);
                     }
                     catch (...) {
-                        filters[key] = value; // оставляем строкой если не число
+                        filters[key] = value_str;
                     }
                 }
                 else if (key == "engine_volume") {
                     try {
-                        filters[key] = std::stod(value);
+                        filters[key] = std::stod(value_str);
                     }
                     catch (...) {
-                        filters[key] = value;
+                        filters[key] = value_str;
                     }
                 }
                 else {
-                    filters[key] = value;
+                    filters[key] = value_str;
                 }
             }
         }
