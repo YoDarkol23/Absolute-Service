@@ -1,6 +1,11 @@
 #pragma once
 #include <string>
 
+namespace nlohmann {
+    class json;
+}
+using json = nlohmann::json;
+
 // === HTTP-запросы к серверу ===
 std::string fetch_all_cars(const std::string& host = "127.0.0.1", int port = 8080);
 std::string fetch_cars_by_specs(const std::string& specs, const std::string& host = "127.0.0.1", int port = 8080);
@@ -18,7 +23,7 @@ void print_documents_list(const json& documents);
 void print_delivery_process(const json& process);
 void print_search_results(const json& results);
 void print_admin_login_result(const json& result);
-void print_delivery_calculation(const json& calculation); // Добавить эту строку
+void print_delivery_calculation(const json& calculation);
 
 // === Интерфейс пользователя ===
 void display_main_menu();
