@@ -41,74 +41,52 @@ std::string handle_post_search(const std::string& body) {
                 }
 
                 std::string filter_str = filter_value.get<std::string>();
-                double car_num = 0;
-                bool car_is_number = false;
+                std::string car_str = car[key].dump(); // Преобразуем в строку для сравнения
 
-                // Пробуем преобразовать значение автомобиля в число
-                try {
-                    if (car[key].is_number()) {
-                        car_num = car[key].get<double>();
-                        car_is_number = true;
-                    }
-                    else {
-                        car_num = std::stod(car[key].get<std::string>());
-                        car_is_number = true;
-                    }
-                }
-                catch (...) {
-                    car_is_number = false;
-                }
-
-                // Проверяем операторы сравнения
-                if (car_is_number && (filter_str.find('>') != std::string::npos ||
-                    filter_str.find('<') != std::string::npos ||
-                    filter_str.find('=') != std::string::npos)) {
-
-                    double filter_num = 0;
+                // Для числовых полей проверяем операторы
+                if (key == "horsepower" || key == "year" || key == "price_usd" || key == "engine_volume") {
                     try {
-                        // Извлекаем число из строки с оператором
-                        size_t op_pos = filter_str.find_first_of("><=!");
-                        if (op_pos != std::string::npos) {
-                            filter_num = std::stod(filter_str.substr(op_pos + 1));
+                        double car_num = std::stod(car_str);
+                        double filter_num = 0;
+
+                        // Определяем оператор и извлекаем число
+                        if (filter_str.find(">=") == 0) {
+                            filter_num = std::stod(filter_str.substr(2));
+                            if (car_num < filter_num) { match = false; break; }
+                        }
+                        else if (filter_str.find("<=") == 0) {
+                            filter_num = std::stod(filter_str.substr(2));
+                            if (car_num > filter_num) { match = false; break; }
+                        }
+                        else if (filter_str.find(">") == 0) {
+                            filter_num = std::stod(filter_str.substr(1));
+                            if (car_num <= filter_num) { match = false; break; }
+                        }
+                        else if (filter_str.find("<") == 0) {
+                            filter_num = std::stod(filter_str.substr(1));
+                            if (car_num >= filter_num) { match = false; break; }
+                        }
+                        else if (filter_str.find("=") == 0) {
+                            filter_num = std::stod(filter_str.substr(1));
+                            if (car_num != filter_num) { match = false; break; }
                         }
                         else {
+                            // Просто число без оператора
                             filter_num = std::stod(filter_str);
+                            if (car_num != filter_num) { match = false; break; }
                         }
                     }
                     catch (...) {
-                        match = false;
-                        break;
+                        // Если не число, сравниваем как строки
+                        if (car_str != filter_str) {
+                            match = false;
+                            break;
+                        }
                     }
-
-                    // Применяем оператор
-                    if (filter_str.find(">=") != std::string::npos) {
-                        if (car_num < filter_num) { match = false; break; }
-                    }
-                    else if (filter_str.find("<=") != std::string::npos) {
-                        if (car_num > filter_num) { match = false; break; }
-                    }
-                    else if (filter_str.find(">") != std::string::npos) {
-                        if (car_num <= filter_num) { match = false; break; }
-                    }
-                    else if (filter_str.find("<") != std::string::npos) {
-                        if (car_num >= filter_num) { match = false; break; }
-                    }
-                    else if (filter_str.find("=") != std::string::npos) {
-                        if (car_num != filter_num) { match = false; break; }
-                    }
-                    else {
-                        // Просто число без оператора
-                        if (car_num != filter_num) { match = false; break; }
-                    }
-
                 }
                 else {
-                    // Строковое сравнение (точное совпадение)
-                    std::string car_value = car[key].get<std::string>();
-                    std::transform(car_value.begin(), car_value.end(), car_value.begin(), ::tolower);
-                    std::transform(filter_str.begin(), filter_str.end(), filter_str.begin(), ::tolower);
-
-                    if (car_value != filter_str) {
+                    // Строковые поля - точное совпадение
+                    if (car_str != filter_str) {
                         match = false;
                         break;
                     }
@@ -130,6 +108,9 @@ std::string handle_post_search(const std::string& body) {
         }
         return response.dump();
     }
+    catch (const std::exception& e) {
+        return R"({"error": "Search error: )" + std::string(e.what()) + "\"}";
+    }
     catch (...) {
         return R"({"error": "Invalid search request format"})";
     }
@@ -137,123 +118,107 @@ std::string handle_post_search(const std::string& body) {
 
 // GET /search?brand=...&model=...
 std::string handle_get_search(const std::string& query_string) {
-    // Парсинг query_string: brand=Toyota&horsepower<=160
-    json filters;
-    std::istringstream iss(query_string);
-    std::string param;
+    try {
+        // Парсинг query_string: brand=Toyota&horsepower>=150
+        json filters = json::object();
+        std::istringstream iss(query_string);
+        std::string param;
 
-    while (std::getline(iss, param, '&')) {
-        size_t eq = param.find('=');
-        if (eq != std::string::npos) {
-            std::string key = param.substr(0, eq);
-            std::string value = param.substr(eq + 1);
-
-            // Просто передаем как есть, обработка будет в основном алгоритме
-            filters[key] = value;
+        while (std::getline(iss, param, '&')) {
+            size_t eq = param.find('=');
+            if (eq != std::string::npos) {
+                std::string key = param.substr(0, eq);
+                std::string value = param.substr(eq + 1);
+                filters[key] = value;  // Просто передаем как строку
+            }
         }
-    }
 
-    json cars = load_cars_db();
-    json results = json::array();
+        json cars = load_cars_db();
+        json results = json::array();
 
-    for (const auto& car : cars) {
-        bool match = true;
+        for (const auto& car : cars) {
+            bool match = true;
 
-        for (auto& [key, filter_value] : filters.items()) {
-            if (!car.contains(key)) {
-                match = false;
-                break;
-            }
-
-            std::string filter_str = filter_value.get<std::string>();
-            double car_num = 0;
-            bool car_is_number = false;
-
-            // Пробуем преобразовать значение автомобиля в число
-            try {
-                if (car[key].is_number()) {
-                    car_num = car[key].get<double>();
-                    car_is_number = true;
-                }
-                else {
-                    car_num = std::stod(car[key].get<std::string>());
-                    car_is_number = true;
-                }
-            }
-            catch (...) {
-                car_is_number = false;
-            }
-
-            // Проверяем операторы сравнения для числовых полей
-            if (car_is_number && (filter_str.find('>') != std::string::npos ||
-                filter_str.find('<') != std::string::npos ||
-                filter_str.find('=') != std::string::npos)) {
-
-                double filter_num = 0;
-                try {
-                    // Извлекаем число из строки с оператором
-                    size_t op_pos = filter_str.find_first_of("><=!");
-                    if (op_pos != std::string::npos) {
-                        filter_num = std::stod(filter_str.substr(op_pos + 1));
-                    }
-                    else {
-                        filter_num = std::stod(filter_str);
-                    }
-                }
-                catch (...) {
+            for (auto& [key, filter_value] : filters.items()) {
+                if (!car.contains(key)) {
                     match = false;
                     break;
                 }
 
-                // Применяем оператор
-                if (filter_str.find(">=") != std::string::npos) {
-                    if (car_num < filter_num) { match = false; break; }
-                }
-                else if (filter_str.find("<=") != std::string::npos) {
-                    if (car_num > filter_num) { match = false; break; }
-                }
-                else if (filter_str.find(">") != std::string::npos) {
-                    if (car_num <= filter_num) { match = false; break; }
-                }
-                else if (filter_str.find("<") != std::string::npos) {
-                    if (car_num >= filter_num) { match = false; break; }
-                }
-                else if (filter_str.find("=") != std::string::npos) {
-                    if (car_num != filter_num) { match = false; break; }
+                std::string filter_str = filter_value.get<std::string>();
+                std::string car_str = car[key].dump(); // Преобразуем в строку для сравнения
+
+                // Для числовых полей проверяем операторы
+                if (key == "horsepower" || key == "year" || key == "price_usd" || key == "engine_volume") {
+                    try {
+                        double car_num = std::stod(car_str);
+                        double filter_num = 0;
+
+                        // Определяем оператор и извлекаем число
+                        if (filter_str.find(">=") == 0) {
+                            filter_num = std::stod(filter_str.substr(2));
+                            if (car_num < filter_num) { match = false; break; }
+                        }
+                        else if (filter_str.find("<=") == 0) {
+                            filter_num = std::stod(filter_str.substr(2));
+                            if (car_num > filter_num) { match = false; break; }
+                        }
+                        else if (filter_str.find(">") == 0) {
+                            filter_num = std::stod(filter_str.substr(1));
+                            if (car_num <= filter_num) { match = false; break; }
+                        }
+                        else if (filter_str.find("<") == 0) {
+                            filter_num = std::stod(filter_str.substr(1));
+                            if (car_num >= filter_num) { match = false; break; }
+                        }
+                        else if (filter_str.find("=") == 0) {
+                            filter_num = std::stod(filter_str.substr(1));
+                            if (car_num != filter_num) { match = false; break; }
+                        }
+                        else {
+                            // Просто число без оператора
+                            filter_num = std::stod(filter_str);
+                            if (car_num != filter_num) { match = false; break; }
+                        }
+                    }
+                    catch (...) {
+                        // Если не число, сравниваем как строки
+                        if (car_str != filter_str) {
+                            match = false;
+                            break;
+                        }
+                    }
                 }
                 else {
-                    // Просто число без оператора
-                    if (car_num != filter_num) { match = false; break; }
+                    // Строковые поля - точное совпадение
+                    if (car_str != filter_str) {
+                        match = false;
+                        break;
+                    }
                 }
-
             }
-            else {
-                // Строковое сравнение (точное совпадение)
-                std::string car_value = car[key].get<std::string>();
-                std::transform(car_value.begin(), car_value.end(), car_value.begin(), ::tolower);
-                std::transform(filter_str.begin(), filter_str.end(), filter_str.begin(), ::tolower);
 
-                if (car_value != filter_str) {
-                    match = false;
-                    break;
-                }
+            if (match) {
+                results.push_back(car);
             }
         }
 
-        if (match) {
-            results.push_back(car);
+        json response;
+        response["found"] = results.size();
+        if (!results.empty()) {
+            response["results"] = results;
         }
+        else {
+            response["message"] = "No vehicles found matching the specified criteria";
+        }
+        return response.dump();
     }
-
-    json response;
-    response["found"] = results.size();
-    if (!results.empty()) {
-        response["results"] = results;
+    catch (const std::exception& e) {
+        return R"({"error": "Search error: )" + std::string(e.what()) + "\"}";
     }
-    else {
-        response["message"] = "No vehicles found matching the specified criteria";
+    catch (...) {
+        return R"({"error": "Invalid search request format"})";
     }
-    return response.dump();
 }
 
 // GET /cities

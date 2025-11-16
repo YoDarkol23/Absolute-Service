@@ -37,9 +37,7 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
             if (pos != std::string::npos) {
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
-
-                // Просто передаем как есть, обработка на сервере
-                filters[key] = value;
+                filters[key] = value;  // Просто передаем как строку
             }
         }
 
