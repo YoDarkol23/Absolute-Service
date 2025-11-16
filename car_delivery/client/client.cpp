@@ -312,41 +312,6 @@ void print_admin_login_result(const json& result) {
     }
 }
 
-void display_response(const std::string& response) {
-    try {
-        std::string json_body = extract_json_from_response(response);
-        auto j = json::parse(json_body);
-
-        if (j.is_array() && !j.empty() && j[0].contains("brand")) {
-            print_car_table(j);
-        }
-        else if (j.is_array() && !j.empty() && j[0].contains("name") && j[0].contains("delivery_days")) {
-            print_cities_table(j);
-        }
-        else if (j.contains("documents")) {
-            print_documents_list(j);
-        }
-        else if (j.contains("process")) {
-            print_delivery_process(j);
-        }
-        else if (j.contains("results") || j.contains("found")) {
-            print_search_results(j);
-        }
-        else if (j.contains("status") || j.contains("error")) {
-            print_admin_login_result(j);
-        }
-        else if (j.contains("calculation") && j.contains("summary")) {
-            print_delivery_calculation(j); // Добавляем обработку расчёта доставки
-        }
-        else {
-            std::cout << j.dump(2) << '\n';
-        }
-    }
-    catch (const json::exception& e) {
-        std::cerr << "JSON parse error: " << e.what() << "\nRaw response:\n" << response << '\n';
-    }
-}
-
 // Функция для красивого вывода результатов расчёта доставки
 void print_delivery_calculation(const json& calculation) {
     if (calculation.contains("error")) {
@@ -435,4 +400,39 @@ void print_delivery_calculation(const json& calculation) {
     }
 
     std::cout << "========================================\n\n";
+}
+
+void display_response(const std::string& response) {
+    try {
+        std::string json_body = extract_json_from_response(response);
+        auto j = json::parse(json_body);
+
+        if (j.is_array() && !j.empty() && j[0].contains("brand")) {
+            print_car_table(j);
+        }
+        else if (j.is_array() && !j.empty() && j[0].contains("name") && j[0].contains("delivery_days")) {
+            print_cities_table(j);
+        }
+        else if (j.contains("documents")) {
+            print_documents_list(j);
+        }
+        else if (j.contains("process")) {
+            print_delivery_process(j);
+        }
+        else if (j.contains("results") || j.contains("found")) {
+            print_search_results(j);
+        }
+        else if (j.contains("status") || j.contains("error")) {
+            print_admin_login_result(j);
+        }
+        else if (j.contains("calculation") && j.contains("summary")) {
+            print_delivery_calculation(j); // Добавляем обработку расчёта доставки
+        }
+        else {
+            std::cout << j.dump(2) << '\n';
+        }
+    }
+    catch (const json::exception& e) {
+        std::cerr << "JSON parse error: " << e.what() << "\nRaw response:\n" << response << '\n';
+    }
 }
