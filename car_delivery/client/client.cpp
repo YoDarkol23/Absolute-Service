@@ -84,9 +84,7 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
                 }
                 else {
                     // Иначе создаем объект с оператором
-                    if (!filters.contains(field)) {
-                        filters[field] = json::object();
-                    }
+                    filters[field] = json::object();
                     filters[field][op] = value;
                 }
             }
