@@ -31,18 +31,28 @@ std::string handle_post_search(const std::string& body) {
         json cars = load_cars_db();
         json results = json::array();
 
-        std::cout << "DEBUG: Processing search with filters: " << filters.dump() << std::endl;
-
         for (const auto& car : cars) {
             bool match = true;
-            for (auto& [key, value] : filters.items()) {
+            for (auto& [key, filter_value] : filters.items()) {
                 if (!car.contains(key)) {
                     match = false;
                     break;
                 }
 
-                // Простое сравнение значений
-                if (car[key] != value) {
+                // Простое сравнение через строки
+                std::string car_str = car[key].dump();
+                std::string filter_str = filter_value.dump();
+
+                // Убираем кавычки для строк
+                if (car[key].is_string()) {
+                    car_str = car[key].get<std::string>();
+                }
+                if (filter_value.is_string()) {
+                    filter_str = filter_value.get<std::string>();
+                }
+
+                // Сравниваем как строки
+                if (car_str != filter_str) {
                     match = false;
                     break;
                 }
@@ -57,15 +67,9 @@ std::string handle_post_search(const std::string& body) {
         if (!results.empty()) {
             response["results"] = results;
         }
-        std::cout << "DEBUG: Found " << results.size() << " results" << std::endl;
         return response.dump();
     }
-    catch (const std::exception& e) {
-        std::cout << "DEBUG: Search error: " << e.what() << std::endl;
-        return R"({"error": "Search error: )" + std::string(e.what()) + "\"}";
-    }
     catch (...) {
-        std::cout << "DEBUG: Unknown search error" << std::endl;
         return R"({"error": "Invalid search request format"})";
     }
 }
@@ -89,12 +93,26 @@ std::string handle_get_search(const std::string& query_string) {
         json cars = load_cars_db();
         json results = json::array();
 
-        std::cout << "DEBUG: GET search with filters: " << filters.dump() << std::endl;
-
         for (const auto& car : cars) {
             bool match = true;
-            for (auto& [key, value] : filters.items()) {
-                if (!car.contains(key) || car[key] != value) {
+            for (auto& [key, filter_value] : filters.items()) {
+                if (!car.contains(key)) {
+                    match = false;
+                    break;
+                }
+
+                // Простое сравнение через строки
+                std::string car_str = car[key].dump();
+                std::string filter_str = filter_value.dump();
+
+                if (car[key].is_string()) {
+                    car_str = car[key].get<std::string>();
+                }
+                if (filter_value.is_string()) {
+                    filter_str = filter_value.get<std::string>();
+                }
+
+                if (car_str != filter_str) {
                     match = false;
                     break;
                 }
@@ -109,12 +127,7 @@ std::string handle_get_search(const std::string& query_string) {
         if (!results.empty()) {
             response["results"] = results;
         }
-        std::cout << "DEBUG: GET found " << results.size() << " results" << std::endl;
         return response.dump();
-    }
-    catch (const std::exception& e) {
-        std::cout << "DEBUG: GET search error: " << e.what() << std::endl;
-        return R"({"error": "Search error: )" + std::string(e.what()) + "\"}";
     }
     catch (...) {
         return R"({"error": "Invalid search request format"})";
