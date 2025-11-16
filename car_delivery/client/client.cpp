@@ -29,7 +29,7 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
     try {
         std::cout << "Search specs: " << specs << std::endl;
 
-        // Парсим параметры и формируем JSON фильтры
+        // Парсим параметры и формируем JSON фильтры с поддержкой >= и <=
         json filters = json::object();
         std::istringstream iss(specs);
         std::string pair;
@@ -40,25 +40,54 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
                 std::string key = pair.substr(0, pos);
                 std::string value_str = pair.substr(pos + 1);
 
+                // Определяем поле и оператор
+                std::string field = key;
+                std::string op = "$eq"; // оператор по умолчанию
+
+                // Проверяем операторы >= и <=
+                if (key.find(">=") != std::string::npos) {
+                    size_t op_pos = key.find(">=");
+                    field = key.substr(0, op_pos);
+                    op = "$gte";
+                }
+                else if (key.find("<=") != std::string::npos) {
+                    size_t op_pos = key.find("<=");
+                    field = key.substr(0, op_pos);
+                    op = "$lte";
+                }
+
                 // Преобразуем значение в правильный тип
-                if (key == "year" || key == "horsepower" || key == "price_usd") {
+                json value;
+                if (field == "year" || field == "horsepower" || field == "price_usd") {
                     try {
-                        filters[key] = std::stoi(value_str);
+                        value = std::stoi(value_str);
                     }
                     catch (...) {
-                        filters[key] = value_str;
+                        value = value_str;
                     }
                 }
-                else if (key == "engine_volume") {
+                else if (field == "engine_volume") {
                     try {
-                        filters[key] = std::stod(value_str);
+                        value = std::stod(value_str);
                     }
                     catch (...) {
-                        filters[key] = value_str;
+                        value = value_str;
                     }
                 }
                 else {
-                    filters[key] = value_str;
+                    value = value_str;
+                }
+
+                // Если это оператор по умолчанию, используем простое значение
+                if (op == "$eq") {
+                    filters[field] = value;
+                }
+                else {
+                    // Иначе создаем объект с оператором
+                    if (!filters.contains(field)) {
+                        filters[field] = json::object();
+                    }
+                    filters[field][op] = value;
                 }
             }
         }

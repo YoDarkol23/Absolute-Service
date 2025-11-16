@@ -23,7 +23,7 @@ std::string handle_get_cars() {
     return cars.dump();
 }
 
-// POST /search — поиск по JSON-фильтрам
+// POST /search — поиск по JSON-фильтрам с поддержкой >= и <=
 std::string handle_post_search(const std::string& body) {
     try {
         std::cout << "POST /search body: " << body << std::endl;
@@ -42,17 +42,49 @@ std::string handle_post_search(const std::string& body) {
         for (const auto& car : cars) {
             bool match = true;
 
-            for (auto& [key, value] : filters.items()) {
+            for (auto& [key, filter_value] : filters.items()) {
                 if (!car.contains(key)) {
                     match = false;
                     break;
                 }
 
-                // Простое сравнение значений (только равно)
-                if (car[key] != value) {
-                    match = false;
-                    break;
+                auto car_value = car[key];
+
+                // Если фильтр - объект с операторами (>=, <=)
+                if (filter_value.is_object()) {
+                    for (auto& [op, value] : filter_value.items()) {
+                        if (op == "$gte") {
+                            // Больше или равно >=
+                            if (!(car_value >= value)) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        else if (op == "$lte") {
+                            // Меньше или равно <=
+                            if (!(car_value <= value)) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        else {
+                            // Неизвестный оператор - считаем как равно
+                            if (car_value != value) {
+                                match = false;
+                                break;
+                            }
+                        }
+                    }
                 }
+                // Простое сравнение (по умолчанию =)
+                else {
+                    if (car_value != filter_value) {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (!match) break;
             }
 
             if (match) {
