@@ -35,58 +35,62 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
         std::string pair;
 
         while (std::getline(iss, pair, ',')) {
-            size_t pos = pair.find('=');
-            if (pos != std::string::npos) {
-                std::string key = pair.substr(0, pos);
-                std::string value_str = pair.substr(pos + 1);
+            // Ищем операторы >= и <=
+            std::string field, op, value_str;
 
-                // Определяем поле и оператор
-                std::string field = key;
-                std::string op = "$eq"; // оператор по умолчанию
+            if (pair.find(">=") != std::string::npos) {
+                size_t op_pos = pair.find(">=");
+                field = pair.substr(0, op_pos);
+                op = "$gte";
+                value_str = pair.substr(op_pos + 2);
+            }
+            else if (pair.find("<=") != std::string::npos) {
+                size_t op_pos = pair.find("<=");
+                field = pair.substr(0, op_pos);
+                op = "$lte";
+                value_str = pair.substr(op_pos + 2);
+            }
+            else if (pair.find('=') != std::string::npos) {
+                size_t op_pos = pair.find('=');
+                field = pair.substr(0, op_pos);
+                op = "$eq";
+                value_str = pair.substr(op_pos + 1);
+            }
+            else {
+                // Пропускаем некорректные параметры
+                continue;
+            }
 
-                // Проверяем операторы >= и <=
-                if (key.find(">=") != std::string::npos) {
-                    size_t op_pos = key.find(">=");
-                    field = key.substr(0, op_pos);
-                    op = "$gte";
+            // Преобразуем значение в правильный тип
+            json value;
+            if (field == "year" || field == "horsepower" || field == "price_usd") {
+                try {
+                    value = std::stoi(value_str);
                 }
-                else if (key.find("<=") != std::string::npos) {
-                    size_t op_pos = key.find("<=");
-                    field = key.substr(0, op_pos);
-                    op = "$lte";
-                }
-
-                // Преобразуем значение в правильный тип
-                json value;
-                if (field == "year" || field == "horsepower" || field == "price_usd") {
-                    try {
-                        value = std::stoi(value_str);
-                    }
-                    catch (...) {
-                        value = value_str;
-                    }
-                }
-                else if (field == "engine_volume") {
-                    try {
-                        value = std::stod(value_str);
-                    }
-                    catch (...) {
-                        value = value_str;
-                    }
-                }
-                else {
+                catch (...) {
                     value = value_str;
                 }
+            }
+            else if (field == "engine_volume") {
+                try {
+                    value = std::stod(value_str);
+                }
+                catch (...) {
+                    value = value_str;
+                }
+            }
+            else {
+                value = value_str;
+            }
 
-                // Если это оператор по умолчанию, используем простое значение
-                if (op == "$eq") {
-                    filters[field] = value;
-                }
-                else {
-                    // Иначе создаем объект с оператором
-                    filters[field] = json::object();
-                    filters[field][op] = value;
-                }
+            // Если это оператор по умолчанию, используем простое значение
+            if (op == "$eq") {
+                filters[field] = value;
+            }
+            else {
+                // Иначе создаем объект с оператором
+                filters[field] = json::object();
+                filters[field][op] = value;
             }
         }
 
