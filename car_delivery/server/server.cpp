@@ -83,69 +83,116 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         std::string client_ip = remote_ep.address().to_string();
         std::cout << "[+] Новое подключение от " << client_ip << std::endl;
 
+        // Читаем весь запрос
         boost::asio::streambuf buffer;
-        boost::asio::read_until(*socket, buffer, "\r\n\r\n");
+        boost::system::error_code ec;
+
+        // Читаем заголовки
+        boost::asio::read_until(*socket, buffer, "\r\n\r\n", ec);
+        if (ec && ec != boost::asio::error::eof) {
+            std::cerr << "Ошибка чтения заголовков: " << ec.message() << std::endl;
+            return;
+        }
+
         std::string request{
             std::istreambuf_iterator<char>(&buffer),
             std::istreambuf_iterator<char>()
         };
 
-        // Чтение тела, если Content-Length > 0
+        // Определяем длину тела для POST запросов
+        size_t content_length = 0;
         size_t cl_pos = request.find("Content-Length: ");
         if (cl_pos != std::string::npos) {
-            size_t end = request.find("\r\n", cl_pos);
-            int len = std::stoi(request.substr(cl_pos + 16, end - cl_pos - 16));
-            if (len > 0) {
-                std::vector<char> body(len);
-                boost::asio::read(*socket, boost::asio::buffer(body));
-                request += std::string(body.begin(), body.end());
+            size_t end_line = request.find("\r\n", cl_pos);
+            std::string cl_str = request.substr(cl_pos + 16, end_line - cl_pos - 16);
+            try {
+                content_length = std::stoul(cl_str);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Ошибка парсинга Content-Length: " << e.what() << std::endl;
             }
         }
 
+        // Читаем тело если есть
+        if (content_length > 0) {
+            // Уже прочитали часть тела в буфер после заголовков
+            size_t body_start_pos = request.find("\r\n\r\n");
+            if (body_start_pos != std::string::npos) {
+                body_start_pos += 4;
+                size_t already_read = request.length() - body_start_pos;
+
+                // Добираем оставшиеся данные если нужно
+                if (already_read < content_length) {
+                    size_t remaining = content_length - already_read;
+                    std::vector<char> body_part(remaining);
+
+                    boost::asio::read(*socket, boost::asio::buffer(body_part), ec);
+                    if (!ec) {
+                        request += std::string(body_part.begin(), body_part.end());
+                    }
+                }
+            }
+        }
+
+        // Обработка запросов
         std::string response_body;
-        if (request.find("GET /cars") != std::string::npos) {
+
+        else if (request.find("POST /search") == 0) {
+            size_t body_start = request.find("\r\n\r\n");
+            if (body_start != std::string::npos) {
+                std::string body = request.substr(body_start + 4);
+                response_body = handle_post_search(body);
+            }
+            else {
+                response_body = R"({"error": "No body in POST /search"})";
+            }
+        }
+        // ... остальные обработчики остаются без изменений
+        else if (request.find("GET /cars") == 0) {
             response_body = handle_get_cars();
         }
-        else if (request.find("POST /search") != std::string::npos) {
-            size_t b = request.find("\r\n\r\n");
-            response_body = (b != std::string::npos)
-                ? handle_post_search(request.substr(b + 4))
-                : R"({"error": "No body in POST /search"})";
-        }
-        else if (request.find("GET /search?") != std::string::npos) {
+        else if (request.find("GET /search?") == 0) {
             size_t s = request.find('?'), e = request.find(' ', s);
             response_body = (s != std::string::npos && e != std::string::npos)
                 ? handle_get_search(request.substr(s + 1, e - s - 1))
                 : R"({"error": "Invalid query in GET /search"})";
         }
-        else if (request.find("GET /cities") != std::string::npos) {
+        else if (request.find("GET /cities") == 0) {
             response_body = handle_get_cities();
         }
-        else if (request.find("GET /documents") != std::string::npos) {
+        else if (request.find("GET /documents") == 0) {
             response_body = handle_get_documents();
         }
-        else if (request.find("GET /delivery") != std::string::npos) {
+        else if (request.find("GET /delivery") == 0) {
             response_body = handle_get_delivery();
         }
-        else if (request.find("POST /admin/login") != std::string::npos) {
-            size_t b = request.find("\r\n\r\n");
-            response_body = (b != std::string::npos)
-                ? handle_post_admin_login(request.substr(b + 4))
-                : R"({"error": "No body in POST /admin/login"})";
+        else if (request.find("POST /admin/login") == 0) {
+            size_t body_start = request.find("\r\n\r\n");
+            if (body_start != std::string::npos) {
+                std::string body = request.substr(body_start + 4);
+                response_body = handle_post_admin_login(body);
+            }
+            else {
+                response_body = R"({"error": "No body in POST /admin/login"})";
+            }
         }
         else {
             response_body = R"({"error": "Endpoint not supported"})";
         }
 
+        // Отправка ответа
         std::ostringstream resp;
         resp << "HTTP/1.1 200 OK\r\n"
-             << "Content-Type: application/json\r\n"
-             << "Content-Length: " << response_body.size() << "\r\n"
-             << "Connection: close\r\n\r\n"
-             << response_body;
+            << "Content-Type: application/json\r\n"
+            << "Content-Length: " << response_body.size() << "\r\n"
+            << "Connection: close\r\n\r\n"
+            << response_body;
+
         boost::asio::write(*socket, boost::asio::buffer(resp.str()));
         std::cout << "[✓] Запрос от " << client_ip << " обработан\n";
-    } catch (std::exception& e) {
-        std::cerr << "[!] Ошибка: " << e.what() << std::endl;
+
+    }
+    catch (std::exception& e) {
+        std::cerr << "[!] Ошибка обработки клиента " << e.what() << std::endl;
     }
 }

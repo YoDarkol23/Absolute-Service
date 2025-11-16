@@ -1,4 +1,3 @@
-
 #include "client.hpp"
 #include "../common/utils.hpp"
 #include "json.hpp"
@@ -30,11 +29,10 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
     try {
         std::cout << "Search specs: " << specs << std::endl;
 
-        // Парсим параметры и формируем query string
-        std::ostringstream query_stream;
+        // Парсим параметры и формируем JSON фильтры
+        json filters = json::object();
         std::istringstream iss(specs);
         std::string pair;
-        bool first_param = true;
 
         while (std::getline(iss, pair, ',')) {
             size_t pos = pair.find('=');
@@ -42,26 +40,46 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
 
-                // URL encode (простая версия)
-                if (!first_param) {
-                    query_stream << "&";
+                // Преобразуем числовые значения
+                if (key == "year" || key == "horsepower" || key == "price_usd") {
+                    try {
+                        filters[key] = std::stoi(value);
+                    }
+                    catch (...) {
+                        filters[key] = value; // оставляем строкой если не число
+                    }
                 }
-                query_stream << key << "=" << value;
-                first_param = false;
+                else if (key == "engine_volume") {
+                    try {
+                        filters[key] = std::stod(value);
+                    }
+                    catch (...) {
+                        filters[key] = value;
+                    }
+                }
+                else {
+                    filters[key] = value;
+                }
             }
         }
 
-        std::string query_string = query_stream.str();
-        std::cout << "Query string: " << query_string << std::endl;
+        // Формируем JSON тело запроса
+        json request_body;
+        request_body["filters"] = filters;
+        std::string body = request_body.dump();
 
-        // Формируем GET запрос
+        std::cout << "Request body: " << body << std::endl;
+
+        // Формируем POST запрос
         std::string request =
-            "GET /search?" + query_string + " HTTP/1.1\r\n"
+            "POST /search HTTP/1.1\r\n"
             "Host: " + host + "\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: " + std::to_string(body.size()) + "\r\n"
             "Connection: close\r\n"
-            "\r\n";
+            "\r\n" + body;
 
-        std::cout << "Sending GET request..." << std::endl;
+        std::cout << "Sending POST request..." << std::endl;
         return send_http_request(host, port, request);
     }
     catch (const std::exception& e) {
