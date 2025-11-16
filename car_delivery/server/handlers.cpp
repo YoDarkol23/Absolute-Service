@@ -26,15 +26,52 @@ std::string handle_get_cars() {
 // POST /search — поиск по JSON-фильтрам
 std::string handle_post_search(const std::string& body) {
     try {
+        std::cout << "POST /search body: " << body << std::endl; // debug
+
         json request = json::parse(body);
         json filters = request.value("filters", json::object());
         json cars = load_cars_db();
         json results = json::array();
 
+        std::cout << "Filters: " << filters.dump() << std::endl; // debug
+
         for (const auto& car : cars) {
             bool match = true;
             for (auto& [key, value] : filters.items()) {
-                if (!car.contains(key) || car[key] != value) {
+                if (!car.contains(key)) {
+                    match = false;
+                    break;
+                }
+
+                // Более гибкое сравнение для разных типов данных
+                if (car[key].type() != value.type()) {
+                    // Попробуем преобразовать типы
+                    try {
+                        if (value.is_string() && car[key].is_number()) {
+                            // Сравниваем число со строкой
+                            if (std::to_string(car[key].get<int>()) != value.get<std::string>()) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        else if (value.is_number() && car[key].is_string()) {
+                            // Сравниваем строку с числом
+                            if (car[key].get<std::string>() != std::to_string(value.get<int>())) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        else {
+                            match = false;
+                            break;
+                        }
+                    }
+                    catch (...) {
+                        match = false;
+                        break;
+                    }
+                }
+                else if (car[key] != value) {
                     match = false;
                     break;
                 }
@@ -49,9 +86,12 @@ std::string handle_post_search(const std::string& body) {
         if (!results.empty()) {
             response["results"] = results;
         }
+
+        std::cout << "Found " << results.size() << " results" << std::endl; // debug
         return response.dump();
     }
-    catch (...) {
+    catch (const std::exception& e) {
+        std::cerr << "Search error: " << e.what() << std::endl;
         return R"({"error": "Invalid search request format"})";
     }
 }

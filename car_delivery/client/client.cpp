@@ -28,19 +28,39 @@ std::string fetch_all_cars(const std::string& host, int port) {
 
 std::string fetch_cars_by_specs(const std::string& specs, const std::string& host, int port) {
     try {
+        std::cout << "Search specs: " << specs << std::endl; // debug
+
         json filters = json::object();
         std::istringstream iss(specs);
         std::string pair;
+
         while (std::getline(iss, pair, ',')) {
             size_t pos = pair.find('=');
             if (pos != std::string::npos) {
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
-                filters[key] = value;
+
+                // Попробуем преобразовать числовые значения
+                try {
+                    if (key == "year" || key == "horsepower" || key == "price_usd" ||
+                        key == "id" || key == "engine_volume") {
+                        filters[key] = std::stoi(value);
+                    }
+                    else {
+                        filters[key] = value;
+                    }
+                }
+                catch (...) {
+                    filters[key] = value; // оставляем как строку если не число
+                }
             }
         }
+
+        std::cout << "Filters JSON: " << filters.dump() << std::endl; // debug
+
         json request_body = { {"filters", filters} };
         std::string body = request_body.dump();
+
         std::string request =
             "POST /search HTTP/1.1\r\n"
             "Host: " + host + "\r\n"
@@ -48,10 +68,16 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
             "Content-Length: " + std::to_string(body.size()) + "\r\n"
             "Connection: close\r\n"
             "\r\n" + body;
-        return send_http_request(host, port, request);
+
+        std::cout << "Sending request..." << std::endl; // debug
+        std::string response = send_http_request(host, port, request);
+        std::cout << "Received response" << std::endl; // debug
+
+        return response;
     }
-    catch (...) {
-        return R"({"error": "Invalid request format"})";
+    catch (const std::exception& e) {
+        std::cerr << "Search error: " << e.what() << std::endl;
+        return R"({"error": "Invalid request format: )" + std::string(e.what()) + "\"}";
     }
 }
 
