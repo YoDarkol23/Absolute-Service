@@ -33,40 +33,88 @@ std::string handle_post_search(const std::string& body) {
 
         for (const auto& car : cars) {
             bool match = true;
-            for (auto& [key, value] : filters.items()) {
+
+            for (auto& [key, filter_value] : filters.items()) {
                 if (!car.contains(key)) {
                     match = false;
                     break;
                 }
 
-                // Сравнение значений с учетом типов
-                if (value.is_string()) {
-                    // Строковое сравнение (регистронезависимое)
-                    std::string car_value = car[key].get<std::string>();
-                    std::string filter_value = value.get<std::string>();
-                    std::transform(car_value.begin(), car_value.end(), car_value.begin(), ::tolower);
-                    std::transform(filter_value.begin(), filter_value.end(), filter_value.begin(), ::tolower);
+                std::string filter_str = filter_value.get<std::string>();
+                double car_num = 0;
+                bool car_is_number = false;
 
-                    if (car_value != filter_value) {
-                        match = false;
-                        break;
+                // Пробуем преобразовать значение автомобиля в число
+                try {
+                    if (car[key].is_number()) {
+                        car_num = car[key].get<double>();
+                        car_is_number = true;
+                    }
+                    else {
+                        car_num = std::stod(car[key].get<std::string>());
+                        car_is_number = true;
                     }
                 }
-                else if (value.is_number()) {
-                    // Числовое сравнение
-                    if (car[key].get<double>() != value.get<double>()) {
+                catch (...) {
+                    car_is_number = false;
+                }
+
+                // Проверяем операторы сравнения
+                if (car_is_number && (filter_str.find('>') != std::string::npos ||
+                    filter_str.find('<') != std::string::npos ||
+                    filter_str.find('=') != std::string::npos)) {
+
+                    double filter_num = 0;
+                    try {
+                        // Извлекаем число из строки с оператором
+                        size_t op_pos = filter_str.find_first_of("><=!");
+                        if (op_pos != std::string::npos) {
+                            filter_num = std::stod(filter_str.substr(op_pos + 1));
+                        }
+                        else {
+                            filter_num = std::stod(filter_str);
+                        }
+                    }
+                    catch (...) {
                         match = false;
                         break;
                     }
+
+                    // Применяем оператор
+                    if (filter_str.find(">=") != std::string::npos) {
+                        if (car_num < filter_num) { match = false; break; }
+                    }
+                    else if (filter_str.find("<=") != std::string::npos) {
+                        if (car_num > filter_num) { match = false; break; }
+                    }
+                    else if (filter_str.find(">") != std::string::npos) {
+                        if (car_num <= filter_num) { match = false; break; }
+                    }
+                    else if (filter_str.find("<") != std::string::npos) {
+                        if (car_num >= filter_num) { match = false; break; }
+                    }
+                    else if (filter_str.find("=") != std::string::npos) {
+                        if (car_num != filter_num) { match = false; break; }
+                    }
+                    else {
+                        // Просто число без оператора
+                        if (car_num != filter_num) { match = false; break; }
+                    }
+
                 }
                 else {
-                    // Другие типы
-                    if (car[key] != value) {
+                    // Строковое сравнение (точное совпадение)
+                    std::string car_value = car[key].get<std::string>();
+                    std::transform(car_value.begin(), car_value.end(), car_value.begin(), ::tolower);
+                    std::transform(filter_str.begin(), filter_str.end(), filter_str.begin(), ::tolower);
+
+                    if (car_value != filter_str) {
                         match = false;
                         break;
                     }
                 }
             }
+
             if (match) {
                 results.push_back(car);
             }
@@ -89,7 +137,7 @@ std::string handle_post_search(const std::string& body) {
 
 // GET /search?brand=...&model=...
 std::string handle_get_search(const std::string& query_string) {
-    // Парсинг query_string: brand=Toyota&model=Camry&horsepower=150
+    // Парсинг query_string: brand=Toyota&horsepower<=160
     json filters;
     std::istringstream iss(query_string);
     std::string param;
@@ -100,27 +148,8 @@ std::string handle_get_search(const std::string& query_string) {
             std::string key = param.substr(0, eq);
             std::string value = param.substr(eq + 1);
 
-            // Преобразование числовых значений
-            if (key == "year" || key == "price_usd" || key == "horsepower" || key == "engine_volume") {
-                try {
-                    if (value.find('.') != std::string::npos) {
-                        // Дробное число (engine_volume)
-                        filters[key] = std::stod(value);
-                    }
-                    else {
-                        // Целое число
-                        filters[key] = std::stoi(value);
-                    }
-                }
-                catch (...) {
-                    // Если не удалось преобразовать, оставляем строкой
-                    filters[key] = value;
-                }
-            }
-            else {
-                // Строковые значения
-                filters[key] = value;
-            }
+            // Просто передаем как есть, обработка будет в основном алгоритме
+            filters[key] = value;
         }
     }
 
@@ -129,40 +158,88 @@ std::string handle_get_search(const std::string& query_string) {
 
     for (const auto& car : cars) {
         bool match = true;
-        for (auto& [key, value] : filters.items()) {
+
+        for (auto& [key, filter_value] : filters.items()) {
             if (!car.contains(key)) {
                 match = false;
                 break;
             }
 
-            // Сравнение значений с учетом типов
-            if (value.is_string()) {
-                // Строковое сравнение (регистронезависимое)
-                std::string car_value = car[key].get<std::string>();
-                std::string filter_value = value.get<std::string>();
-                std::transform(car_value.begin(), car_value.end(), car_value.begin(), ::tolower);
-                std::transform(filter_value.begin(), filter_value.end(), filter_value.begin(), ::tolower);
+            std::string filter_str = filter_value.get<std::string>();
+            double car_num = 0;
+            bool car_is_number = false;
 
-                if (car_value != filter_value) {
-                    match = false;
-                    break;
+            // Пробуем преобразовать значение автомобиля в число
+            try {
+                if (car[key].is_number()) {
+                    car_num = car[key].get<double>();
+                    car_is_number = true;
+                }
+                else {
+                    car_num = std::stod(car[key].get<std::string>());
+                    car_is_number = true;
                 }
             }
-            else if (value.is_number()) {
-                // Числовое сравнение
-                if (car[key].get<double>() != value.get<double>()) {
+            catch (...) {
+                car_is_number = false;
+            }
+
+            // Проверяем операторы сравнения для числовых полей
+            if (car_is_number && (filter_str.find('>') != std::string::npos ||
+                filter_str.find('<') != std::string::npos ||
+                filter_str.find('=') != std::string::npos)) {
+
+                double filter_num = 0;
+                try {
+                    // Извлекаем число из строки с оператором
+                    size_t op_pos = filter_str.find_first_of("><=!");
+                    if (op_pos != std::string::npos) {
+                        filter_num = std::stod(filter_str.substr(op_pos + 1));
+                    }
+                    else {
+                        filter_num = std::stod(filter_str);
+                    }
+                }
+                catch (...) {
                     match = false;
                     break;
                 }
+
+                // Применяем оператор
+                if (filter_str.find(">=") != std::string::npos) {
+                    if (car_num < filter_num) { match = false; break; }
+                }
+                else if (filter_str.find("<=") != std::string::npos) {
+                    if (car_num > filter_num) { match = false; break; }
+                }
+                else if (filter_str.find(">") != std::string::npos) {
+                    if (car_num <= filter_num) { match = false; break; }
+                }
+                else if (filter_str.find("<") != std::string::npos) {
+                    if (car_num >= filter_num) { match = false; break; }
+                }
+                else if (filter_str.find("=") != std::string::npos) {
+                    if (car_num != filter_num) { match = false; break; }
+                }
+                else {
+                    // Просто число без оператора
+                    if (car_num != filter_num) { match = false; break; }
+                }
+
             }
             else {
-                // Другие типы
-                if (car[key] != value) {
+                // Строковое сравнение (точное совпадение)
+                std::string car_value = car[key].get<std::string>();
+                std::transform(car_value.begin(), car_value.end(), car_value.begin(), ::tolower);
+                std::transform(filter_str.begin(), filter_str.end(), filter_str.begin(), ::tolower);
+
+                if (car_value != filter_str) {
                     match = false;
                     break;
                 }
             }
         }
+
         if (match) {
             results.push_back(car);
         }

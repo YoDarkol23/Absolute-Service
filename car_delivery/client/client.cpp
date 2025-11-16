@@ -38,23 +38,8 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
 
-                // Обработка числовых значений
-                if (key == "year" || key == "price_usd" || key == "horsepower" || key == "engine_volume") {
-                    try {
-                        if (value.find('.') != std::string::npos) {
-                            filters[key] = std::stod(value);
-                        }
-                        else {
-                            filters[key] = std::stoi(value);
-                        }
-                    }
-                    catch (...) {
-                        filters[key] = value;
-                    }
-                }
-                else {
-                    filters[key] = value;
-                }
+                // Просто передаем как есть, обработка на сервере
+                filters[key] = value;
             }
         }
 
