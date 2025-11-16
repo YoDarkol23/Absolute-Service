@@ -31,17 +31,36 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
         json filters = json::object();
         std::istringstream iss(specs);
         std::string pair;
+
         while (std::getline(iss, pair, ',')) {
             size_t pos = pair.find('=');
             if (pos != std::string::npos) {
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
-                filters[key] = value;
+
+                // Обработка числовых значений
+                if (key == "year" || key == "price_usd" || key == "horsepower" || key == "engine_volume") {
+                    try {
+                        if (value.find('.') != std::string::npos) {
+                            filters[key] = std::stod(value);
+                        }
+                        else {
+                            filters[key] = std::stoi(value);
+                        }
+                    }
+                    catch (...) {
+                        filters[key] = value;
+                    }
+                }
+                else {
+                    filters[key] = value;
+                }
             }
         }
-        json request_body = {{"filters", filters}};
+
+        json request_body = { {"filters", filters} };
         std::string body = request_body.dump();
-        std::string request = 
+        std::string request =
             "POST /search HTTP/1.1\r\n"
             "Host: " + host + "\r\n"
             "Content-Type: application/json\r\n"
@@ -49,7 +68,8 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
             "Connection: close\r\n"
             "\r\n" + body;
         return send_http_request(host, port, request);
-    } catch (...) {
+    }
+    catch (...) {
         return R"({"error": "Invalid request format"})";
     }
 }
@@ -115,27 +135,30 @@ void print_car_table(const json& cars) {
         return;
     }
     std::cout << std::setw(5) << "ID"
-              << " | " << std::setw(12) << "Brand"
-              << " | " << std::setw(16) << "Model"
-              << " | " << std::setw(4) << "Year"
-              << " | " << std::setw(8) << "Price,$"
-              << " | " << std::setw(8) << "Steering" << '\n';
-    std::cout << std::string(65, '-') << '\n';
+        << " | " << std::setw(12) << "Brand"
+        << " | " << std::setw(16) << "Model"
+        << " | " << std::setw(4) << "Year"
+        << " | " << std::setw(8) << "Price,$"
+        << " | " << std::setw(6) << "HP"
+        << " | " << std::setw(8) << "Steering" << '\n';
+    std::cout << std::string(80, '-') << '\n'; 
     for (const auto& car : cars) {
         int id = car.value("id", 0);
         std::string brand = car.value("brand", "");
         std::string model = car.value("model", "");
         int year = car.value("year", 0);
         int price = car.value("price_usd", 0);
+        int horsepower = car.value("horsepower", 0);  
         std::string steering = (car.value("steering_wheel", "") == "left") ? "Left" : "Right";
         std::cout << std::setw(5) << id
-                  << " | " << std::setw(12) << brand
-                  << " | " << std::setw(16) << model
-                  << " | " << std::setw(4) << year
-                  << " | " << std::setw(8) << price
-                  << " | " << std::setw(8) << steering << '\n';
+            << " | " << std::setw(12) << brand
+            << " | " << std::setw(16) << model
+            << " | " << std::setw(4) << year
+            << " | " << std::setw(8) << price
+            << " | " << std::setw(6) << horsepower
+            << " | " << std::setw(8) << steering << '\n';
     }
-    std::cout << std::string(65, '-') << '\n';
+    std::cout << std::string(80, '-') << '\n';
 }
 
 void print_cities_table(const json& cities) {
