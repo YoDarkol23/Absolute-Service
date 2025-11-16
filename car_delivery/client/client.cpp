@@ -28,11 +28,13 @@ std::string fetch_all_cars(const std::string& host, int port) {
 
 std::string fetch_cars_by_specs(const std::string& specs, const std::string& host, int port) {
     try {
-        std::cout << "Search specs: " << specs << std::endl; // debug
+        std::cout << "Search specs: " << specs << std::endl;
 
-        json filters = json::object();
+        // Парсим параметры и формируем query string
+        std::ostringstream query_stream;
         std::istringstream iss(specs);
         std::string pair;
+        bool first_param = true;
 
         while (std::getline(iss, pair, ',')) {
             size_t pos = pair.find('=');
@@ -40,40 +42,27 @@ std::string fetch_cars_by_specs(const std::string& specs, const std::string& hos
                 std::string key = pair.substr(0, pos);
                 std::string value = pair.substr(pos + 1);
 
-                // Попробуем преобразовать числовые значения
-                try {
-                    if (key == "year" || key == "horsepower" || key == "price_usd" ||
-                        key == "id" || key == "engine_volume") {
-                        filters[key] = std::stoi(value);
-                    }
-                    else {
-                        filters[key] = value;
-                    }
+                // URL encode (простая версия)
+                if (!first_param) {
+                    query_stream << "&";
                 }
-                catch (...) {
-                    filters[key] = value; // оставляем как строку если не число
-                }
+                query_stream << key << "=" << value;
+                first_param = false;
             }
         }
 
-        std::cout << "Filters JSON: " << filters.dump() << std::endl; // debug
+        std::string query_string = query_stream.str();
+        std::cout << "Query string: " << query_string << std::endl;
 
-        json request_body = { {"filters", filters} };
-        std::string body = request_body.dump();
-
+        // Формируем GET запрос
         std::string request =
-            "POST /search HTTP/1.1\r\n"
+            "GET /search?" + query_string + " HTTP/1.1\r\n"
             "Host: " + host + "\r\n"
-            "Content-Type: application/json\r\n"
-            "Content-Length: " + std::to_string(body.size()) + "\r\n"
             "Connection: close\r\n"
-            "\r\n" + body;
+            "\r\n";
 
-        std::cout << "Sending request..." << std::endl; // debug
-        std::string response = send_http_request(host, port, request);
-        std::cout << "Received response" << std::endl; // debug
-
-        return response;
+        std::cout << "Sending GET request..." << std::endl;
+        return send_http_request(host, port, request);
     }
     catch (const std::exception& e) {
         std::cerr << "Search error: " << e.what() << std::endl;
