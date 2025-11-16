@@ -20,6 +20,7 @@ add_executable(server
     server/handlers.cpp
 )
 target_link_libraries(server common ${Boost_LIBRARIES} pthread)
+target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/common)
 
 # Клиент
 add_executable(client
@@ -27,6 +28,7 @@ add_executable(client
     client/client.cpp
 )
 target_link_libraries(client common ${Boost_LIBRARIES} pthread)
+target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/common)
 
 # Копируем данные
 file(COPY data/ DESTINATION ${CMAKE_BINARY_DIR}/data)
