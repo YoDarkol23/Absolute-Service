@@ -180,6 +180,16 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
                 response_body = R"({"error": "No body in POST /admin/login"})";
             }
         }
+        else if (request.find("POST /calculate-delivery") == 0) {
+            size_t body_start = request.find("\r\n\r\n");
+            if (body_start != std::string::npos) {
+                std::string body = request.substr(body_start + 4);
+                response_body = handle_post_calculate_delivery(body);
+            }
+            else {
+                response_body = R"({"error": "No body in POST /calculate-delivery"})";
+            }
+        }
         else {
             response_body = R"({"error": "Endpoint not supported"})";
         }

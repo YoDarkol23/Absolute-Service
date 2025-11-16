@@ -16,6 +16,7 @@ std::string handle_get_search(const std::string& query_string);
 std::string handle_get_cities();
 std::string handle_get_documents();
 std::string handle_get_delivery();
+std::string handle_post_calculate_delivery(const std::string& body);
 
 // Эндпоинт админки
 std::string handle_post_admin_login(const std::string& body);

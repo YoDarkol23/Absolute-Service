@@ -174,6 +174,26 @@ std::string fetch_admin_login(const std::string& username, const std::string& pa
     }
 }
 
+std::string fetch_delivery_calculation(int car_id, int city_id, const std::string& host, int port) {
+    try {
+        json body_json = { {"car_id", car_id}, {"city_id", city_id} };
+        std::string body = body_json.dump();
+
+        std::string request =
+            "POST /calculate-delivery HTTP/1.1\r\n"
+            "Host: " + host + "\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: " + std::to_string(body.size()) + "\r\n"
+            "Connection: close\r\n"
+            "\r\n" + body;
+
+        return send_http_request(host, port, request);
+    }
+    catch (const std::exception& e) {
+        return R"({"error": "Failed to form delivery calculation request: )" + std::string(e.what()) + "\"}";
+    }
+}
+
 void print_car_table(const json& cars) {
     if (cars.empty()) {
         std::cout << "No cars available.\n";
@@ -294,26 +314,125 @@ void print_admin_login_result(const json& result) {
 
 void display_response(const std::string& response) {
     try {
-        // Извлекаем тело JSON из HTTP-ответа (общая функция из common/utils.cpp)
         std::string json_body = extract_json_from_response(response);
         auto j = json::parse(json_body);
 
         if (j.is_array() && !j.empty() && j[0].contains("brand")) {
             print_car_table(j);
-        } else if (j.is_array() && !j.empty() && j[0].contains("name") && j[0].contains("delivery_days")) {
+        }
+        else if (j.is_array() && !j.empty() && j[0].contains("name") && j[0].contains("delivery_days")) {
             print_cities_table(j);
-        } else if (j.contains("documents")) {
+        }
+        else if (j.contains("documents")) {
             print_documents_list(j);
-        } else if (j.contains("process")) {
+        }
+        else if (j.contains("process")) {
             print_delivery_process(j);
-        } else if (j.contains("results") || j.contains("found")) {
+        }
+        else if (j.contains("results") || j.contains("found")) {
             print_search_results(j);
-        } else if (j.contains("status") || j.contains("error")) {
+        }
+        else if (j.contains("status") || j.contains("error")) {
             print_admin_login_result(j);
-        } else {
+        }
+        else if (j.contains("calculation") && j.contains("summary")) {
+            print_delivery_calculation(j); // Добавляем обработку расчёта доставки
+        }
+        else {
             std::cout << j.dump(2) << '\n';
         }
-    } catch (const json::exception& e) {
+    }
+    catch (const json::exception& e) {
         std::cerr << "JSON parse error: " << e.what() << "\nRaw response:\n" << response << '\n';
     }
+}
+
+// Функция для красивого вывода результатов расчёта доставки
+void print_delivery_calculation(const json& calculation) {
+    if (calculation.contains("error")) {
+        std::cout << "Ошибка: " << calculation["error"] << '\n';
+        return;
+    }
+
+    std::cout << "\n========================================\n";
+    std::cout << "       РАСЧЁТ СТОИМОСТИ ДОСТАВКИ       \n";
+    std::cout << "========================================\n";
+
+    // Информация об автомобиле
+    if (calculation.contains("car")) {
+        auto& car = calculation["car"];
+        std::cout << "АВТОМОБИЛЬ:\n";
+        std::cout << "  " << car.value("brand", "") << " " << car.value("model", "")
+            << " (" << car.value("year", 0) << " год, "
+            << car.value("age_years", 0) << " лет)\n";
+        std::cout << "  Объём двигателя: " << car.value("engine_volume", 0.0)
+            << " л (" << car.value("engine_volume_cm3", 0) << " см³)\n";
+        std::cout << "  Мощность: " << car.value("horsepower", 0) << " л.с.\n";
+        std::cout << "  Стоимость: $" << car.value("price_usd", 0)
+            << " (€" << std::fixed << std::setprecision(0) << car.value("price_eur", 0)
+            << ", " << car.value("price_rub", 0) << " руб.)\n";
+    }
+
+    // Информация о городе
+    if (calculation.contains("city")) {
+        auto& city = calculation["city"];
+        std::cout << "ГОРОД ДОСТАВКИ: " << city.value("name", "") << "\n";
+        std::cout << "Срок доставки: " << city.value("delivery_days", 0) << " дней\n";
+    }
+
+    // Курсы валют
+    if (calculation.contains("exchange_rates")) {
+        auto& rates = calculation["exchange_rates"];
+        std::cout << "Курсы: USD = " << rates.value("USD_TO_RUB", 0.0)
+            << " руб., EUR = " << rates.value("EUR_TO_RUB", 0.0) << " руб.\n";
+    }
+
+    std::cout << "----------------------------------------\n";
+    std::cout << "РАСЧЁТ ТАМОЖЕННЫХ ПЛАТЕЖЕЙ:\n";
+
+    if (calculation.contains("customs_calculation")) {
+        auto& customs = calculation["customs_calculation"];
+        std::cout << "  Метод расчёта пошлины: " << customs.value("method", "") << "\n";
+        std::cout << std::fixed << std::setprecision(0);
+        std::cout << "  Таможенная пошлина: €" << customs.value("duty_eur", 0.0)
+            << " (" << customs.value("duty_rub", 0.0) << " руб.)\n";
+
+        // Вывод утильсбора с информацией о типе
+        std::cout << "  Утильсбор (" << calculation["car"].value("horsepower", 0)
+            << " л.с., " << calculation["car"].value("engine_volume", 0.0)
+            << " л, " << customs.value("utilization_fee_type", "") << "): "
+            << customs.value("utilization_fee_rub", 0.0) << " руб.\n";
+
+        std::cout << "  Таможенное оформление: " << customs.value("customs_clearance_rub", 0.0) << " руб.\n";
+        std::cout << "  Комиссия брокера: " << customs.value("broker_fee_rub", 0.0) << " руб.\n";
+    }
+
+    std::cout << "----------------------------------------\n";
+    std::cout << "ОБЩИЙ РАСЧЁТ:\n";
+
+    if (calculation.contains("calculation")) {
+        auto& calc = calculation["calculation"];
+        std::cout << std::fixed << std::setprecision(0);
+        std::cout << "  Стоимость авто: " << calc.value("car_price_rub", 0.0) << " руб.\n";
+        std::cout << "  Таможенные платежи: " << calc.value("customs_duty_rub", 0.0)
+            << " + " << calc.value("utilization_fee_rub", 0.0)
+            << " + " << calc.value("customs_clearance_rub", 0.0)
+            << " + " << calc.value("broker_fee_rub", 0.0) << " руб.\n";
+        std::cout << "  Доставка до города: $" << calc.value("city_delivery_cost_usd", 0.0)
+            << " (" << calc.value("city_delivery_cost_rub", 0.0) << " руб.)\n";
+    }
+
+    std::cout << "----------------------------------------\n";
+
+    if (calculation.contains("summary")) {
+        auto& summary = calculation["summary"];
+        std::cout << std::fixed << std::setprecision(0);
+        std::cout << "ИТОГО К ОПЛАТЕ:\n";
+        std::cout << "  " << summary.value("total_cost_rub", 0.0) << " руб.\n";
+        std::cout << "  ($" << std::fixed << std::setprecision(2)
+            << summary.value("total_cost_usd", 0.0) << ")\n";
+        std::cout << "  Срок: " << summary.value("delivery_days", 0) << " дней\n";
+    }
+
+    std::cout << "========================================\n\n";
 }

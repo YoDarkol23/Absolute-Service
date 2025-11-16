@@ -17,9 +17,10 @@ int main() {
                   << "2. Search vehicles by specifications\n"
                   << "3. Search by brand and model\n"
                   << "4. Delivery cities\n"
-                  << "5. Required documents\n"
-                  << "6. Delivery process\n"
-                  << "7. Administrator login\n"
+                  << "5. Calculate delivery cost\n"
+                  << "6. Required documents\n"
+                  << "7. Delivery process\n"
+                  << "8. Administrator login\n"
                   << "0. Exit\n"
                   << "========================================\n"
                   << "Enter your choice: ";
@@ -60,19 +61,33 @@ int main() {
                 display_response(response);
                 break;
 
-            case 5:
+            case 5: {
+                std::cout << "\nCalculate delivery cost\n";
+                std::cout << "Enter car ID: ";
+                int car_id;
+                std::cin >> car_id;
+                std::cout << "Enter city ID: ";
+                int city_id;
+                std::cin >> city_id;
+                std::cin.ignore();
+
+                response = fetch_delivery_calculation(car_id, city_id, host, client_port);
+                display_response(response);
+                break;
+            }
+            case 6:
                 std::cout << "\nFetching required documents...\n";
                 response = fetch_required_documents(host, client_port);
                 display_response(response);
                 break;
 
-            case 6:
+            case 7:
                 std::cout << "\nFetching delivery process information...\n";
                 response = fetch_delivery_process(host, client_port);
                 display_response(response);
                 break;
 
-            case 7: {
+            case 8: {
                 std::cout << "\nAdministrator login\nUsername: ";
                 std::string username, password;
                 std::getline(std::cin, username);

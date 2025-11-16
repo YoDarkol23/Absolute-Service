@@ -10,6 +10,7 @@ std::string fetch_delivery_cities(const std::string& host = "127.0.0.1", int por
 std::string fetch_required_documents(const std::string& host = "127.0.0.1", int port = 8080);
 std::string fetch_delivery_process(const std::string& host = "127.0.0.1", int port = 8080);
 std::string fetch_admin_login(const std::string& username, const std::string& password, const std::string& host = "127.0.0.1", int port = 8080);
+std::string fetch_delivery_calculation(int car_id, int city_id, const std::string& host = "127.0.0.1", int port = 8080);
 
 // === Интерфейс пользователя ===
 
