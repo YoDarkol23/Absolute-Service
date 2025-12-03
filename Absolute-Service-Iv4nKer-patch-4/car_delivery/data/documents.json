@@ -1,0 +1,54 @@
+{
+    "documents": [
+        {
+            "id": 1,
+            "category": "purchase",
+            "name": "Паспорт"
+        },
+        {
+            "id": 2,
+            "category": "purchase",
+            "name": "Свидетельство ИНН"
+        },
+        {
+            "id": 3,
+            "category": "purchase",
+            "name": "СНИЛС"
+        },
+        {
+            "id": 4,
+            "category": "registration",
+            "name": "Паспорт"
+        },
+        {
+            "id": 5,
+            "category": "registration",
+            "name": "Заявление на постановку на учет"
+        },
+        {
+            "id": 6,
+            "category": "registration",
+            "name": "Квитанция об уплате госпошлины (и её копия)"
+        },
+        {
+            "id": 7,
+            "category": "registration",
+            "name": "ЭПТС (электронный ПТС)"
+        },
+        {
+            "id": 8,
+            "category": "registration",
+            "name": "Страховой полис ОСАГО"
+        },
+        {
+            "id": 9,
+            "category": "registration",
+            "name": "Таможенный приходный ордер"
+        },
+        {
+            "id": 10,
+            "category": "registration",
+            "name": "Пассажирская таможенная декларация (ПТД)"
+        }
+    ]
+}
