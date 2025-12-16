@@ -1,9 +1,9 @@
 Вместо cmake .. / cmake -DBUILD_TESTS=ON ..
 
 Запустите тесты с помощью CTest:
-ctest
-ctest -R Utils
-ctest -R Handler
+ctest ИЛИ
+ctest -R Utils ИЛИ
+ctest -R Handler 
 
 Клиент-серверное консольное приложение для сервиса доставки автомобилей
 
