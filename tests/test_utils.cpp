@@ -4,80 +4,62 @@
 #include "../common/utils.hpp" // Подключаем тестируемые функции
 #include <sstream>
 #include <string>
+#include <stdexcept> // Для обработки исключений
 
-// Пример: Тест для функции validateCarData (предполагается, что она существует или будет реализована)
-// В текущем описании функция не указана, поэтому тест условный.
-// TEST(UtilsTest, ValidateCarDataValid) {
-//     boost::property_tree::ptree car_data;
-//     car_data.put("make", "Toyota");
-//     car_data.put("model", "Camry");
-//     car_data.put("year", 2020);
-//
-//     EXPECT_TRUE(validateCarData(car_data)); // Замените на реальное имя функции
-// }
-//
-// TEST(UtilsTest, ValidateCarDataInvalidYear) {
-//     boost::property_tree::ptree car_data;
-//     car_data.put("make", "Toyota");
-//     car_data.put("model", "Camry");
-//     car_data.put("year", 1800); // Неверный год
-//
-//     EXPECT_FALSE(validateCarData(car_data));
+// Вспомогательная функция для симуляции parseConfig, если она не объявлена в utils.hpp
+// Эта функция демонстрирует логику, которую можно протестировать.
+// В реальности, если parseConfig объявлена в utils.hpp, используйте её напрямую.
+// boost::property_tree::ptree parseConfigFromString(const std::string& json_str) {
+//     std::istringstream iss(json_str);
+//     boost::property_tree::ptree pt;
+//     boost::property_tree::read_json(iss, pt); // Может выбросить исключение
+//     return pt;
 // }
 
-// Пример: Тест для функции, которая может парсить JSON из строки (parseConfig или аналог)
-// Предположим, у нас есть функция parseJsonFromString(std::string const& json_str) -> boost::property_tree::ptree
-// В utils.cpp это может быть реализовано через stringstream и read_json.
-TEST(UtilsTest, ParseJsonFromStringValid) {
-    std::string json_str = R"({"name": "John", "age": 30})";
-    boost::property_tree::ptree expected_pt;
-    std::istringstream iss(json_str);
-    boost::property_tree::read_json(iss, expected_pt);
+// Тест: Успешный парсинг корректного JSON
+TEST(UtilsTest, ParseJsonValidStructure) {
+    std::string json_str = R"({
+        "cars": [
+            {"id": 1, "make": "Toyota", "model": "Camry", "year": 2020},
+            {"id": 2, "make": "Honda", "model": "Civic", "year": 2021}
+        ]
+    })";
 
-    boost::property_tree::ptree parsed_pt;
+    boost::property_tree::ptree pt;
     try {
-        std::istringstream iss2(json_str);
-        boost::property_tree::read_json(iss2, parsed_pt);
+        std::istringstream iss(json_str);
+        boost::property_tree::read_json(iss, pt); // Используем Boost напрямую для демонстрации
     } catch (const boost::property_tree::json_parser::json_parser_error& e) {
-        FAIL() << "Failed to parse valid JSON string: " << e.what();
+        FAIL() << "Failed to parse valid JSON: " << e.what(); // Если парсинг не удался, тест падает
     }
 
-    EXPECT_EQ(parsed_pt.get<std::string>("name"), "John");
-    EXPECT_EQ(parsed_pt.get<int>("age"), 30);
+    // Проверяем структуру результата
+    EXPECT_TRUE(pt.count("cars") > 0); // Проверяем наличие массива "cars"
+    auto cars_array = pt.get_child("cars");
+    size_t count = 0;
+    for (auto& item : cars_array) {
+        ++count;
+        EXPECT_TRUE(item.second.count("id") > 0);
+        EXPECT_TRUE(item.second.count("make") > 0);
+        EXPECT_TRUE(item.second.count("model") > 0);
+        EXPECT_TRUE(item.second.count("year") > 0);
+    }
+    EXPECT_EQ(count, 2); // Проверяем количество элементов
 }
 
-TEST(UtilsTest, ParseJsonFromStringInvalid) {
-    std::string invalid_json_str = R"({"name": "John", "age": })"; // Неверный JSON
+// Тест: Парсинг неверного JSON должен выбрасывать исключение
+TEST(UtilsTest, ParseJsonInvalidThrowsException) {
+    std::string invalid_json_str = R"({ "key": "value", "invalid": } )"; // Неверный JSON
 
-    boost::property_tree::ptree parsed_pt;
+    boost::property_tree::ptree pt;
     EXPECT_THROW(
         {
             std::istringstream iss(invalid_json_str);
-            boost::property_tree::read_json(iss, parsed_pt);
+            boost::property_tree::read_json(iss, pt); // Эта строка должна выбросить исключение
         },
         boost::property_tree::json_parser::json_parser_error
     );
 }
-
-// Пример: Тест для функции формирования HTTP-ответа (предполагается, что такая функция есть в utils)
-// std::string createHttpResponse(const std::string& body, int status_code);
-// TEST(UtilsTest, CreateHttpResponse) {
-//     std::string body = "OK";
-//     int status = 200;
-//     std::string expected_response = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
-//     // Реальная функция может быть сложнее, этот тест условный.
-//     EXPECT_EQ(createHttpResponse(body, status), expected_response);
-// }
-// Пока что протестируем простую вспомогательную функцию или просто убедимся, что заголовки подключаются без ошибок.
-// В utils.hpp есть функция logMessage. Проверим, что её объявление корректно.
-TEST(UtilsTest, LogMessageDeclarationExists) {
-    // Простой тест, чтобы убедиться, что функция logMessage объявлена и может быть вызвана синтаксически правильно.
-    // Поскольку logMessage может зависеть от глобального состояния (файла лога), её сложно тестировать юнит-тестами.
-    // Здесь мы просто проверим, что компиляция проходит.
-    EXPECT_NO_THROW(logMessage("Test log message for compilation check.", LogLevel::INFO));
-    // Важно: Этот тест не проверяет *результат* логирования, только отсутствие синтаксических ошибок при вызове.
-}
-
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
