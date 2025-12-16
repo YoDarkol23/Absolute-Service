@@ -34,25 +34,38 @@ target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/common)
 # Копируем данные
 file(COPY data/ DESTINATION ${CMAKE_BINARY_DIR}/data)
 
-option(BUILD_TESTS "Build tests" OFF) # Опция для включения/выключения сборки тестов
+option(BUILD_TESTS "Build tests" OFF)
 
 if(BUILD_TESTS)
-    enable_testing() # Включаем CTest
+    enable_testing()
 
-    find_package(GTest REQUIRED) # Находим Google Test
+    # Найдем Google Test
+    find_package(GTest REQUIRED)
 
-    # Создаем исполняемый файл теста
-    add_executable(test_utils tests/test_utils.cpp common/utils.cpp) # Добавляем тестируемый .cpp файл
-    target_link_libraries(test_utils GTest::gtest GTest::gtest_main) # Линкуем с Google Test
-    target_include_directories(test_utils PRIVATE common) # Указываем, где искать заголовочные файлы (common/, server/ etc.)
-
-    # Добавляем тест в CTest
+    # Тесты для common/utils.*
+    add_executable(test_utils
+        tests/test_utils.cpp
+        common/utils.cpp # Компилируем тестируемый .cpp файл
+    )
+    target_link_libraries(test_utils GTest::gtest GTest::gtest_main pthread)
+    target_include_directories(test_utils PRIVATE common server) # Указываем пути к заголовкам
     add_test(NAME UtilsTests COMMAND test_utils)
 
-    # Аналогично для других тестов, например:
-    # add_executable(test_handlers tests/test_handlers.cpp server/handlers.cpp server/utils.cpp common/utils.cpp)
-    # target_link_libraries(test_handlers GTest::gtest GTest::gtest_main)
-    # target_include_directories(test_handlers PRIVATE common server)
-    # add_test(NAME HandlerTests COMMAND test_handlers)
+    # Тесты для server/handlers.*
+    add_executable(test_handlers
+        tests/test_handlers.cpp
+        server/handlers.cpp
+        server/server.cpp # Возможно, нужен для Mock объектов или утилит
+        common/utils.cpp  # Зависимость от utils
+    )
+    target_link_libraries(test_handlers GTest::gtest GTest::gtest_main pthread boost_system)
+    target_include_directories(test_handlers PRIVATE common server)
+    add_test(NAME HandlerTests COMMAND test_handlers)
+
+    # Тесты для server/server.* (если нужно тестировать логику сервера напрямую)
+    # add_executable(test_server_logic tests/test_server_logic.cpp server/server.cpp common/utils.cpp)
+    # target_link_libraries(test_server_logic GTest::gtest GTest::gtest_main pthread boost_system)
+    # target_include_directories(test_server_logic PRIVATE common server)
+    # add_test(NAME ServerLogicTests COMMAND test_server_logic)
 
 endif()
