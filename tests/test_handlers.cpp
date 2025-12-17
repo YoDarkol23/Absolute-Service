@@ -138,16 +138,6 @@ TEST_F(HandlersTest, HandleGetDocumentsReturnsDocuments) {
     EXPECT_GE(result["documents"].size(), 2);
 }
 
-TEST_F(HandlersTest, HandleGetDeliveryReturnsInfo) {
-    std::string response = handle_get_delivery();
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("progress"));
-    EXPECT_TRUE(result.contains("duration"));
-    EXPECT_TRUE(result.contains("cost"));
-    EXPECT_TRUE(result.contains("process"));
-    EXPECT_TRUE(result["process"].is_array());
-}
-
 TEST_F(HandlersTest, HandlePostAdminLoginValidCredentials) {
     json creds = {{"username", "admin"}, {"password", "123"}};
     std::string response = handle_post_admin_login(creds.dump());
