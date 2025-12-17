@@ -1,12 +1,15 @@
 #define BOOST_TEST_MODULE HandlersTest
 #include <boost/test/included/unit_test.hpp>
 
-// Подключаем заголовочные файлы, содержащие тестируемую логику
-#include "../server/handlers.hpp"
-#include "../common/utils.hpp" // Может понадобиться для JSON операций
+// Подключаем заголовочные файлы, содержащие тестируемую логику и используемые типы
+#include "../server/handlers.hpp" // Здесь объявлена fetch_cars_by_specs
+#include "../common/utils.hpp"    // Здесь может быть нужен nlohmann::json или другие утилиты
+// Если utils.hpp не включает nlohmann/json напрямую, возможно, нужно:
+// #include <nlohmann/json.hpp> // Проверьте, нужен ли этот прямой импорт
 
 // --- Вспомогательные функции для тестов ---
-nlohmann::json create_sample_cars_json() {
+// Объявляем статическими, чтобы избежать конфликта линковки, если этот файл будет включен в другое место
+static nlohmann::json create_sample_cars_json() {
     return nlohmann::json::array({
         {
             {"id", 1},
@@ -42,7 +45,7 @@ nlohmann::json create_sample_cars_json() {
 }
 
 // Функция для проверки равенства двух JSON массивов/объектов
-bool json_arrays_equal(const nlohmann::json& arr1, const nlohmann::json& arr2) {
+static bool json_arrays_equal(const nlohmann::json& arr1, const nlohmann::json& arr2) {
     if (arr1.size() != arr2.size()) {
         return false;
     }
@@ -95,27 +98,14 @@ BOOST_AUTO_TEST_CASE(fetch_cars_by_specs_PartialMatch_OnlyExactMatched) {
     auto cars = create_sample_cars_json();
     // Ищем только по brand, должен вернуть все Toyota
     nlohmann::json specs = {{"brand", "Toyota"}};
-    nlohmann::json expected_result = nlohmann::json::array({
-        cars[0] // Toyota Camry 2020
-    });
-
-    auto result = fetch_cars_by_specs(cars, specs);
-
-    BOOST_REQUIRE(result.is_array());
-    // В данном случае ожидаем одно совпадение по бренду, но specs не включает год
-    // fetch_cars_by_specs ищет точное совпадение для ВСЕХ указанных полей specs
-    // Поэтому результат должен быть пустым, если specs {"brand": "Toyota"} не является полным объектом машины
-    // Нужно уточнить поведение specs. Specs - это шаблон, по которому ищутся поля.
-    // fetch_cars_by_specs ищет машины, у которых все поля из specs совпадают со своими значениями.
-    // Поэтому {"brand": "Toyota"} означает найти машины, у которых brand="Toyota".
-    // Он не требует, чтобы у машины были все остальные поля из specs, только чтобы совпадали указанные.
-    // Исправленный ожидаемый результат:
     nlohmann::json expected_result_partial = nlohmann::json::array();
     for (const auto& car : cars) {
          if (car.contains("brand") && car["brand"] == "Toyota") {
              expected_result_partial.push_back(car);
          }
     }
+
+    auto result = fetch_cars_by_specs(cars, specs);
 
     BOOST_REQUIRE(result.is_array());
     BOOST_CHECK(json_arrays_equal(result, expected_result_partial)); // Теперь проверяем все Toyota
