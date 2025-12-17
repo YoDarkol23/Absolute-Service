@@ -27,20 +27,20 @@ add_library(common_lib
 target_link_libraries(common_lib ${Boost_LIBRARIES} Threads::Threads)
 
 # Сервер
-add_executable(car_server
+add_executable(server
     server/main.cpp
     server/server.cpp
     server/handlers.cpp
 )
-target_link_libraries(car_server common_lib ${Boost_LIBRARIES} Threads::Threads)
+target_link_libraries(server common_lib ${Boost_LIBRARIES} Threads::Threads)
 
 # Клиент
-add_executable(car_client
+add_executable(client
     client/main.cpp
     client/client.cpp
     client/admin_menu.cpp
 )
-target_link_libraries(car_client common_lib ${Boost_LIBRARIES} Threads::Threads)
+target_link_libraries(client common_lib ${Boost_LIBRARIES} Threads::Threads)
 
 # Копируем данные
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/data)
