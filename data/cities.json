@@ -1,0 +1,12 @@
+[
+    {"id": 1, "name": "Москва", "delivery_days": 30, "delivery_cost": 1000},
+    {"id": 2, "name": "Санкт-Петербург", "delivery_days": 35, "delivery_cost": 1200},
+    {"id": 3, "name": "Нижний Новгород", "delivery_days": 35, "delivery_cost": 1200},
+    {"id": 4, "name": "Казань", "delivery_days": 38, "delivery_cost": 1250},
+    {"id": 5, "name": "Екатеринбург", "delivery_days": 40, "delivery_cost": 1300},
+    {"id": 6, "name": "Новосибирск", "delivery_days": 45, "delivery_cost": 1500},
+    {"id": 7, "name": "Ростов-на-Дону", "delivery_days": 39, "delivery_cost": 1350},
+    {"id": 8, "name": "Владивосток", "delivery_days": 25, "delivery_cost": 800},
+    {"id": 9, "name": "Краснодар", "delivery_days": 37, "delivery_cost": 1250},
+    {"id": 10, "name": "Уфа", "delivery_days": 42, "delivery_cost": 1400}
+]
