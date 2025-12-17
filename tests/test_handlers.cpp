@@ -1,70 +1,358 @@
 #include <gtest/gtest.h>
-#include <boost/property_tree/ptree.hpp>
-#include "../server/handlers.hpp" // Подключаем тестируемые функции
-#include "../common/utils.hpp" // Для работы с ptree и логирования
+#include <fstream>
 #include <string>
-#include <vector>
+#include <cstdio>
+#include <cstdlib>
 
-// Тест для handle_get_cars (предполагая, что она возвращает std::string или boost::property_tree::ptree)
-// Текущая реализация в описании возвращает void и отправляет ответ через connection.
-// Для тестирования логики обработки лучше изолировать саму логику фильтрации/получения данных.
-// Предположим, у нас есть вспомогательная функция getFilteredCars(const boost::property_tree::ptree& request_params)
-// внутри handlers.cpp или utils.cpp, которую мы можем протестировать.
+// Заголовки проекта
+#include "../common/json.hpp"
+#include "../server/handlers.hpp"
 
-// В текущем описании handle_get_cars имеет сигнатуру void handle_get_cars(...),
-// что затрудняет юнит-тестирование без мокирования HTTP-слоя.
-// Давайте протестируем гипотетическую функцию, которая выполняет логику обработки запроса,
-// например, фильтрацию или подготовку ответа на основе данных.
+using json = nlohmann::json;
 
-// Представим, что мы вынесли логику фильтрации в отдельную функцию:
-// boost::property_tree::ptree prepareCarListResponse(const boost::property_tree::ptree& available_cars, const boost::property_tree::ptree& request_params);
+// ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
-// TEST(HandlerTest, PrepareCarListResponseNoFilter) {
-//     boost::property_tree::ptree available_cars;
-//     boost::property_tree::ptree car1, car2;
-//     car1.put("id", 1);
-//     car1.put("make", "Toyota");
-//     car2.put("id", 2);
-//     car2.put("make", "Honda");
-//     available_cars.push_back(std::make_pair("", car1));
-//     available_cars.push_back(std::make_pair("", car2));
-//
-//     boost::property_tree::ptree empty_params; // Без фильтров
-//
-//     auto response_pt = prepareCarListResponse(available_cars, empty_params);
-//     // Проверяем, что в ответе 2 машины
-//     EXPECT_EQ(response_pt.count(""), 2); // Или другой способ подсчёта элементов массива
-// }
+class HandlersTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Создаем временную директорию data
+        system("mkdir -p data");
+        createTestFiles();
+    }
 
-// Тест для handle_admin_request (предполагая, что это заглушка, как указано)
-TEST(HandlerTest, HandleAdminRequestIsStub) {
-    // handle_admin_request в текущей реализации является заглушкой.
-    // Юнит-тест для заглушки может просто проверить, что функция вызывается без падений.
-    // Для этого нам нужно создать фейковые объекты, соответствующие сигнатуре.
-    // Сигнатура: void handle_admin_request(const http_request& req, http_response& res)
-    // Так как типы http_request и http_response не определены в описании, мы не можем создать их экземпляры здесь.
-    // Это ещё одна причина, почему логика должна быть изолирована.
+    void TearDown() override {
+        // Удаляем временные файлы
+        system("rm -rf data");
+    }
 
-    // Если бы handle_admin_request возвращала строку или ptree с результатом операции,
-    // тест был бы проще. Пока что просто подтверждение, что заглушка существует.
-    SUCCEED() << "handle_admin_request is implemented as a stub. Logic isolation needed for better testing.";
+    void createTestFiles() {
+        // Создаем тестовый cars.json
+        std::ofstream cars_file("data/cars.json");
+        cars_file << R"([
+            {
+                "id": 1,
+                "brand": "Toyota",
+                "model": "Camry",
+                "year": 2020,
+                "engine_volume": 2.5,
+                "horsepower": 206,
+                "steering_wheel": "right",
+                "fuel_type": "petrol",
+                "price_usd": 25000,
+                "country": "Japan"
+            },
+            {
+                "id": 2,
+                "brand": "BMW",
+                "model": "3-Series",
+                "year": 2016,
+                "engine_volume": 2.0,
+                "horsepower": 184,
+                "steering_wheel": "left",
+                "fuel_type": "petrol",
+                "price_usd": 17000,
+                "country": "Germany"
+            },
+            {
+                "id": 3,
+                "brand": "Honda",
+                "model": "Accord",
+                "year": 2019,
+                "engine_volume": 2.0,
+                "horsepower": 158,
+                "steering_wheel": "right",
+                "fuel_type": "petrol",
+                "price_usd": 15000,
+                "country": "Japan"
+            }
+        ])";
+        cars_file.close();
+
+        // Создаем тестовый cities.json
+        std::ofstream cities_file("data/cities.json");
+        cities_file << R"([
+            {
+                "id": 1,
+                "name": "Москва",
+                "delivery_days": 30,
+                "delivery_cost": 1000
+            },
+            {
+                "id": 2,
+                "name": "Санкт-Петербург",
+                "delivery_days": 35,
+                "delivery_cost": 1200
+            }
+        ])";
+        cities_file.close();
+
+        // Создаем тестовый documents.json
+        std::ofstream documents_file("data/documents.json");
+        documents_file << R"({
+            "documents": [
+                {
+                    "id": 1,
+                    "category": "purchase",
+                    "name": "Паспорт"
+                },
+                {
+                    "id": 2,
+                    "category": "registration",
+                    "name": "Заявление"
+                }
+            ]
+        })";
+        documents_file.close();
+    }
+
+    json parseResponse(const std::string& response) {
+        try {
+            return json::parse(response);
+        } catch (...) {
+            return json::object();
+        }
+    }
+};
+
+// ==================== БАЗОВЫЕ ТЕСТЫ ====================
+
+TEST_F(HandlersTest, HandleGetCarsReturnsArray) {
+    std::string response = handle_get_cars();
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.is_array());
+    EXPECT_GE(result.size(), 3);
 }
 
-// Пример: Тест для вспомогательной функции, которая может быть в handlers.cpp или utils.cpp
-// и отвечает за обработку конкретного типа запроса, например, получение всех автомобилей.
-// Предположим, есть функция loadCarsFromFile(const std::string& filename) -> std::vector<CarData>;
-// struct CarData { int id; std::string make; std::string model; int year; };
-// TEST(HandlerTest, LoadCarsFromFile) {
-//     // Требуется mock файла или копия реального файла в директорию теста.
-//     // std::string temp_file_path = "./test_cars.json";
-//     // copyRealFileToTemp(temp_file_path); // Вспомогательная функция
-//     // auto cars = loadCarsFromFile(temp_file_path);
-//     // EXPECT_GT(cars.size(), 0); // Проверить, что загружено что-то
-//     // cleanupTempFile(temp_file_path); // Вспомогательная функция
-//     // Этот тест сложнее из-за зависимости от файловой системы.
-// }
+TEST_F(HandlersTest, HandleGetCitiesReturnsArray) {
+    std::string response = handle_get_cities();
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.is_array());
+    EXPECT_GE(result.size(), 2);
+}
+
+TEST_F(HandlersTest, HandleGetDocumentsReturnsDocuments) {
+    std::string response = handle_get_documents();
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("documents"));
+    EXPECT_TRUE(result["documents"].is_array());
+    EXPECT_GE(result["documents"].size(), 2);
+}
+
+TEST_F(HandlersTest, HandleGetDeliveryReturnsInfo) {
+    std::string response = handle_get_delivery();
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("progress"));
+    EXPECT_TRUE(result.contains("duration"));
+    EXPECT_TRUE(result.contains("cost"));
+    EXPECT_TRUE(result.contains("process"));
+    EXPECT_TRUE(result["process"].is_array());
+}
+
+TEST_F(HandlersTest, HandlePostAdminLoginValidCredentials) {
+    json creds = {{"username", "admin"}, {"password", "123"}};
+    std::string response = handle_post_admin_login(creds.dump());
+    json result = parseResponse(response);
+    EXPECT_EQ(result["status"], "success");
+    EXPECT_EQ(result["user"]["username"], "admin");
+    EXPECT_EQ(result["user"]["role"], "admin");
+}
+
+TEST_F(HandlersTest, HandlePostAdminLoginInvalidCredentials) {
+    json creds = {{"username", "admin"}, {"password", "wrong"}};
+    std::string response = handle_post_admin_login(creds.dump());
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("error"));
+}
+
+TEST_F(HandlersTest, HandleGetSearchFindsCars) {
+    std::string query = "brand=Toyota";
+    std::string response = handle_get_search(query);
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("found"));
+    EXPECT_TRUE(result.contains("results"));
+    EXPECT_GE(result["found"], 1);
+}
+
+TEST_F(HandlersTest, HandleGetSearchMultipleParams) {
+    std::string query = "brand=Honda&model=Accord";
+    std::string response = handle_get_search(query);
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("found"));
+    EXPECT_TRUE(result.contains("results"));
+}
+
+TEST_F(HandlersTest, HandleGetSearchEmptyQuery) {
+    std::string query = "";
+    std::string response = handle_get_search(query);
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("found"));
+    EXPECT_TRUE(result.contains("results"));
+    EXPECT_GE(result["found"], 3); // Все автомобили
+}
+
+TEST_F(HandlersTest, HandlePostSearchWithSimpleFilters) {
+    json request = {
+        {"filters", {
+            {"brand", "Toyota"},
+            {"year", 2020}
+        }}
+    };
+    
+    std::string response = handle_post_search(request.dump());
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("found"));
+    EXPECT_TRUE(result.contains("results"));
+}
+
+TEST_F(HandlersTest, HandlePostSearchEmptyBody) {
+    std::string response = handle_post_search("");
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("error"));
+}
+
+TEST_F(HandlersTest, HandleGetAdminCars) {
+    std::string response = handle_get_admin_cars();
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.is_array());
+    EXPECT_GE(result.size(), 3);
+}
+
+TEST_F(HandlersTest, HandleGetAdminCities) {
+    std::string response = handle_get_admin_cities();
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.is_array());
+    EXPECT_GE(result.size(), 2);
+}
+
+TEST_F(HandlersTest, HandleGetAdminDocuments) {
+    std::string response = handle_get_admin_documents();
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("documents"));
+    EXPECT_TRUE(result["documents"].is_array());
+}
+
+TEST_F(HandlersTest, HandlePostCalculateDelivery) {
+    json request = {{"car_id", 1}, {"city_id", 1}};
+    std::string response = handle_post_calculate_delivery(request.dump());
+    json result = parseResponse(response);
+    
+    EXPECT_FALSE(result.contains("error"));
+    EXPECT_TRUE(result.contains("car"));
+    EXPECT_TRUE(result.contains("city"));
+    EXPECT_TRUE(result.contains("calculation"));
+    EXPECT_TRUE(result.contains("summary"));
+    
+    if (result.contains("summary")) {
+        EXPECT_GT(result["summary"]["total_cost_rub"], 0);
+        EXPECT_GT(result["summary"]["total_cost_usd"], 0);
+    }
+}
+
+TEST_F(HandlersTest, HandlePostCalculateDeliveryMissingParams) {
+    json request = {{"car_id", 1}}; // Нет city_id
+    std::string response = handle_post_calculate_delivery(request.dump());
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("error"));
+}
+
+TEST_F(HandlersTest, HandlePostCalculateDeliveryCarNotFound) {
+    json request = {{"car_id", 999}, {"city_id", 1}};
+    std::string response = handle_post_calculate_delivery(request.dump());
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("error"));
+}
+
+TEST_F(HandlersTest, HandlePostCalculateDeliveryCityNotFound) {
+    json request = {{"car_id", 1}, {"city_id", 999}};
+    std::string response = handle_post_calculate_delivery(request.dump());
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("error"));
+}
+
+// ==================== ТЕСТЫ ДЛЯ УТИЛЬСБОРА ====================
+
+TEST(UtilizationFeeTest, CalculateUtilizationFeeBenefitCar) {
+    // Автомобиль под льготу (до 160 л.с. и 3.0 л)
+    double fee = calculate_utilization_fee(2.0, 150, 2);
+    EXPECT_EQ(fee, 3400.0); // Льготный сбор
+}
+
+TEST(UtilizationFeeTest, CalculateUtilizationFeeOldBenefitCar) {
+    // Старый автомобиль под льготу
+    double fee = calculate_utilization_fee(2.0, 150, 5);
+    EXPECT_EQ(fee, 5200.0); // Льготный сбор для старых авто
+}
+
+TEST(UtilizationFeeTest, CalculateUtilizationFeeLuxuryCar) {
+    // Автомобиль с большим объемом
+    double fee = calculate_utilization_fee(3.5, 300, 2);
+    EXPECT_GT(fee, 2000000); // Должен быть большой сбор
+}
+
+// ==================== ТЕСТЫ ДЛЯ АДМИНСКИХ ФУНКЦИЙ ====================
+
+TEST_F(HandlersTest, HandlePostAdminCarsValid) {
+    json new_car = {
+        {"brand", "TestBrand"},
+        {"model", "TestModel"},
+        {"year", 2024},
+        {"price_usd", 30000}
+    };
+    
+    std::string response = handle_post_admin_cars(new_car.dump());
+    json result = parseResponse(response);
+    
+    EXPECT_EQ(result["status"], "success");
+    EXPECT_EQ(result["message"], "Car added successfully");
+    EXPECT_TRUE(result.contains("car"));
+    EXPECT_GE(result["car"]["id"], 4); // Новый ID
+}
+
+TEST_F(HandlersTest, HandlePostAdminCarsMissingFields) {
+    // Нет price_usd
+    json new_car = {
+        {"brand", "TestBrand"},
+        {"model", "TestModel"},
+        {"year", 2024}
+    };
+    
+    std::string response = handle_post_admin_cars(new_car.dump());
+    json result = parseResponse(response);
+    EXPECT_TRUE(result.contains("error"));
+}
+
+TEST_F(HandlersTest, HandlePostAdminCitiesValid) {
+    json new_city = {
+        {"name", "Новосибирск"},
+        {"delivery_days", 45},
+        {"delivery_cost", 1500}
+    };
+    
+    std::string response = handle_post_admin_cities(new_city.dump());
+    json result = parseResponse(response);
+    
+    EXPECT_EQ(result["status"], "success");
+    EXPECT_EQ(result["message"], "City added successfully");
+    EXPECT_TRUE(result.contains("city"));
+}
+
+TEST_F(HandlersTest, HandlePostAdminDocumentsValid) {
+    json new_doc = {
+        {"category", "test"},
+        {"name", "Тестовый документ"}
+    };
+    
+    std::string response = handle_post_admin_documents(new_doc.dump());
+    json result = parseResponse(response);
+    
+    EXPECT_EQ(result["status"], "success");
+    EXPECT_EQ(result["message"], "Document added successfully");
+    EXPECT_TRUE(result.contains("document"));
+}
+
+// ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
 
 int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

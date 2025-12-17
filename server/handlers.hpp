@@ -23,3 +23,5 @@ std::string handle_delete_admin_cities(int city_id);
 std::string handle_get_admin_documents();
 std::string handle_post_admin_documents(const std::string& body);
 std::string handle_delete_admin_documents(const std::string& body);
+// Функция расчета утильсбора
+double calculate_utilization_fee(double engine_volume, int horsepower, int car_age);
