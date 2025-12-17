@@ -318,7 +318,7 @@ void print_admin_login_result(const json& result) {
     }
 }
 
-// Функция для красивого вывода результатов расчёта доставки
+// Функция для вывода результатов расчёта доставки
 void print_delivery_calculation(const json& calculation) {
     if (calculation.contains("error")) {
         std::cout << "Ошибка: " << calculation["error"] << '\n';
