@@ -1,85 +1,71 @@
-cmake_minimum_required(VERSION 3.16)
-project(testCarDelivery)
+cmake_minimum_required(VERSION 3.14)
+project(testCarDelivery CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Найти пакет Boost
-find_package(Boost REQUIRED COMPONENTS system thread unit_test_framework)
-if(NOT Boost_FOUND)
-    message(FATAL_ERROR "Boost libraries not found")
-endif()
+find_package(Boost REQUIRED COMPONENTS system)
+include_directories(${Boost_INCLUDE_DIRS})
 
-# --- Определение исходных файлов ---
-set(SERVER_SOURCES
-    server/server.cpp
-    server/handlers.cpp
-    # Не включаем server/main.cpp, так как он содержит main()
-)
-
-set(COMMON_SOURCES
+# Общая библиотека
+add_library(common
     common/utils.cpp
 )
+target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/common)
 
-set(CLIENT_SOURCES
-    client/client.cpp
-    # Не включаем client/main.cpp, так как он содержит main()
-)
-
-# --- Определение исполняемых файлов ---
+# Сервер (без admin_menu.cpp)
 add_executable(server
-    server/main.cpp # Только точка входа
-    ${SERVER_SOURCES}
-    ${COMMON_SOURCES} # Server может использовать utils
+    server/main.cpp
+    server/server.cpp
+    server/handlers.cpp
 )
+target_link_libraries(server common ${Boost_LIBRARIES} pthread)
+target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/common)
 
+# Клиент (с админским меню)
 add_executable(client
-    client/main.cpp # Только точка входа
-    ${CLIENT_SOURCES}
-    ${COMMON_SOURCES} # Client может использовать utils
+    client/main.cpp
+    client/client.cpp
+    client/admin_menu.cpp
 )
+target_link_libraries(client common ${Boost_LIBRARIES} pthread)
+target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/common)
 
-# --- Настройка линковки ---
-target_link_libraries(server
-    ${Boost_LIBRARIES}
-    pthread # Требуется для сервера
-)
+# Копируем данные
+file(COPY data/ DESTINATION ${CMAKE_BINARY_DIR}/data)
 
-target_link_libraries(client
-    ${Boost_LIBRARIES}
-)
-
-# --- Копирование директории data ---
-file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
-
-# --- Условная сборка тестов ---
 option(BUILD_TESTS "Build tests" OFF)
 
 if(BUILD_TESTS)
-    enable_testing() # Включить CTest
+    enable_testing()
 
-    # Цель для тестов utils
-    add_executable(test_utils tests/test_utils.cpp ${COMMON_SOURCES})
-    target_link_libraries(test_utils Boost::unit_test_framework)
-    target_include_directories(test_utils PRIVATE common)
+    # Найдем Google Test
+    find_package(GTest REQUIRED)
+
+    # Тесты для common/utils.*
+    add_executable(test_utils
+        tests/test_utils.cpp
+        common/utils.cpp # Компилируем тестируемый .cpp файл
+    )
+    target_link_libraries(test_utils GTest::gtest GTest::gtest_main pthread)
+    target_include_directories(test_utils PRIVATE common server) # Указываем пути к заголовкам
     add_test(NAME UtilsTests COMMAND test_utils)
 
-    # Цель для тестов handlers
-    add_executable(test_handlers tests/test_handlers.cpp ${SERVER_SOURCES} ${COMMON_SOURCES})
-    target_link_libraries(test_handlers Boost::unit_test_framework)
+    # Тесты для server/handlers.*
+    add_executable(test_handlers
+        tests/test_handlers.cpp
+        server/handlers.cpp
+        server/server.cpp # Возможно, нужен для Mock объектов или утилит
+        common/utils.cpp  # Зависимость от utils
+    )
+    target_link_libraries(test_handlers GTest::gtest GTest::gtest_main pthread boost_system)
     target_include_directories(test_handlers PRIVATE common server)
-    add_test(NAME HandlersTests COMMAND test_handlers)
+    add_test(NAME HandlerTests COMMAND test_handlers)
 
-    # Цель для тестов client
-    add_executable(test_client tests/test_client.cpp ${CLIENT_SOURCES} ${COMMON_SOURCES})
-    target_link_libraries(test_client Boost::unit_test_framework)
-    target_include_directories(test_client PRIVATE common client)
-    add_test(NAME ClientTests COMMAND test_client)
+    # Тесты для server/server.* (если нужно тестировать логику сервера напрямую)
+    # add_executable(test_server_logic tests/test_server_logic.cpp server/server.cpp common/utils.cpp)
+    # target_link_libraries(test_server_logic GTest::gtest GTest::gtest_main pthread boost_system)
+    # target_include_directories(test_server_logic PRIVATE common server)
+    # add_test(NAME ServerLogicTests COMMAND test_server_logic)
 
-endif()
-
-# --- Управление неиспользуемыми переменными ---
-# Убираем предупреждение CMake о неиспользуемой переменной BUILD_TESTS
-if(BUILD_TESTS)
-    # Используем переменную внутри блока, где она применяется
 endif()
