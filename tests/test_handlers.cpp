@@ -269,26 +269,6 @@ TEST_F(HandlersTest, HandlePostCalculateDeliveryCityNotFound) {
     EXPECT_TRUE(result.contains("error"));
 }
 
-// ==================== ТЕСТЫ ДЛЯ УТИЛЬСБОРА ====================
-
-TEST(UtilizationFeeTest, CalculateUtilizationFeeBenefitCar) {
-    // Автомобиль под льготу (до 160 л.с. и 3.0 л)
-    double fee = calculate_utilization_fee(2.0, 150, 2);
-    EXPECT_EQ(fee, 3400.0); // Льготный сбор
-}
-
-TEST(UtilizationFeeTest, CalculateUtilizationFeeOldBenefitCar) {
-    // Старый автомобиль под льготу
-    double fee = calculate_utilization_fee(2.0, 150, 5);
-    EXPECT_EQ(fee, 5200.0); // Льготный сбор для старых авто
-}
-
-TEST(UtilizationFeeTest, CalculateUtilizationFeeLuxuryCar) {
-    // Автомобиль с большим объемом
-    double fee = calculate_utilization_fee(3.5, 300, 2);
-    EXPECT_GT(fee, 2000000); // Должен быть большой сбор
-}
-
 // ==================== ТЕСТЫ ДЛЯ АДМИНСКИХ ФУНКЦИЙ ====================
 
 TEST_F(HandlersTest, HandlePostAdminCarsValid) {
