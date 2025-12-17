@@ -68,5 +68,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-
-BOOST_AUTO_TEST_SUITE_END()
