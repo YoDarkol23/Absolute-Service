@@ -1,70 +1,163 @@
-#include <gtest/gtest.h>
-#include <boost/property_tree/ptree.hpp>
-#include "../server/handlers.hpp" // Подключаем тестируемые функции
-#include "../common/utils.hpp" // Для работы с ptree и логирования
-#include <string>
-#include <vector>
+#define BOOST_TEST_MODULE HandlersTest
+#include <boost/test/included/unit_test.hpp>
 
-// Тест для handle_get_cars (предполагая, что она возвращает std::string или boost::property_tree::ptree)
-// Текущая реализация в описании возвращает void и отправляет ответ через connection.
-// Для тестирования логики обработки лучше изолировать саму логику фильтрации/получения данных.
-// Предположим, у нас есть вспомогательная функция getFilteredCars(const boost::property_tree::ptree& request_params)
-// внутри handlers.cpp или utils.cpp, которую мы можем протестировать.
+// Подключаем заголовочные файлы, содержащие тестируемую логику
+#include "../server/handlers.hpp"
+#include "../common/utils.hpp" // Может понадобиться для JSON операций
 
-// В текущем описании handle_get_cars имеет сигнатуру void handle_get_cars(...),
-// что затрудняет юнит-тестирование без мокирования HTTP-слоя.
-// Давайте протестируем гипотетическую функцию, которая выполняет логику обработки запроса,
-// например, фильтрацию или подготовку ответа на основе данных.
-
-// Представим, что мы вынесли логику фильтрации в отдельную функцию:
-// boost::property_tree::ptree prepareCarListResponse(const boost::property_tree::ptree& available_cars, const boost::property_tree::ptree& request_params);
-
-// TEST(HandlerTest, PrepareCarListResponseNoFilter) {
-//     boost::property_tree::ptree available_cars;
-//     boost::property_tree::ptree car1, car2;
-//     car1.put("id", 1);
-//     car1.put("make", "Toyota");
-//     car2.put("id", 2);
-//     car2.put("make", "Honda");
-//     available_cars.push_back(std::make_pair("", car1));
-//     available_cars.push_back(std::make_pair("", car2));
-//
-//     boost::property_tree::ptree empty_params; // Без фильтров
-//
-//     auto response_pt = prepareCarListResponse(available_cars, empty_params);
-//     // Проверяем, что в ответе 2 машины
-//     EXPECT_EQ(response_pt.count(""), 2); // Или другой способ подсчёта элементов массива
-// }
-
-// Тест для handle_admin_request (предполагая, что это заглушка, как указано)
-TEST(HandlerTest, HandleAdminRequestIsStub) {
-    // handle_admin_request в текущей реализации является заглушкой.
-    // Юнит-тест для заглушки может просто проверить, что функция вызывается без падений.
-    // Для этого нам нужно создать фейковые объекты, соответствующие сигнатуре.
-    // Сигнатура: void handle_admin_request(const http_request& req, http_response& res)
-    // Так как типы http_request и http_response не определены в описании, мы не можем создать их экземпляры здесь.
-    // Это ещё одна причина, почему логика должна быть изолирована.
-
-    // Если бы handle_admin_request возвращала строку или ptree с результатом операции,
-    // тест был бы проще. Пока что просто подтверждение, что заглушка существует.
-    SUCCEED() << "handle_admin_request is implemented as a stub. Logic isolation needed for better testing.";
+// --- Вспомогательные функции для тестов ---
+nlohmann::json create_sample_cars_json() {
+    return nlohmann::json::array({
+        {
+            {"id", 1},
+            {"brand", "Toyota"},
+            {"model", "Camry"},
+            {"year", 2020},
+            {"engine_volume", 2.5},
+            {"fuel_type", "Gasoline"},
+            {"transmission", "Automatic"},
+            {"price", 25000}
+        },
+        {
+            {"id", 2},
+            {"brand", "Honda"},
+            {"model", "Civic"},
+            {"year", 2018},
+            {"engine_volume", 1.5},
+            {"fuel_type", "Gasoline"},
+            {"transmission", "Manual"},
+            {"price", 18000}
+        },
+        {
+            {"id", 3},
+            {"brand", "Ford"},
+            {"model", "F-150"},
+            {"year", 2022},
+            {"engine_volume", 3.5},
+            {"fuel_type", "Gasoline"},
+            {"transmission", "Automatic"},
+            {"price", 35000}
+        }
+    });
 }
 
-// Пример: Тест для вспомогательной функции, которая может быть в handlers.cpp или utils.cpp
-// и отвечает за обработку конкретного типа запроса, например, получение всех автомобилей.
-// Предположим, есть функция loadCarsFromFile(const std::string& filename) -> std::vector<CarData>;
-// struct CarData { int id; std::string make; std::string model; int year; };
-// TEST(HandlerTest, LoadCarsFromFile) {
-//     // Требуется mock файла или копия реального файла в директорию теста.
-//     // std::string temp_file_path = "./test_cars.json";
-//     // copyRealFileToTemp(temp_file_path); // Вспомогательная функция
-//     // auto cars = loadCarsFromFile(temp_file_path);
-//     // EXPECT_GT(cars.size(), 0); // Проверить, что загружено что-то
-//     // cleanupTempFile(temp_file_path); // Вспомогательная функция
-//     // Этот тест сложнее из-за зависимости от файловой системы.
-// }
-
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+// Функция для проверки равенства двух JSON массивов/объектов
+bool json_arrays_equal(const nlohmann::json& arr1, const nlohmann::json& arr2) {
+    if (arr1.size() != arr2.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < arr1.size(); ++i) {
+        if (arr1[i] != arr2[i]) {
+            return false;
+        }
+    }
+    return true;
 }
+
+// --- Тесты ---
+
+BOOST_AUTO_TEST_SUITE(HandlersSuite)
+
+BOOST_AUTO_TEST_CASE(fetch_cars_by_specs_EmptyList_ReturnsEmpty) {
+    nlohmann::json empty_list = nlohmann::json::array();
+    nlohmann::json specs = {{"brand", "Toyota"}};
+
+    auto result = fetch_cars_by_specs(empty_list, specs);
+
+    BOOST_REQUIRE(result.is_array());
+    BOOST_CHECK_EQUAL(result.size(), 0U);
+}
+
+BOOST_AUTO_TEST_CASE(fetch_cars_by_specs_MatchFound_ReturnsMatched) {
+    auto cars = create_sample_cars_json();
+    nlohmann::json expected_result = nlohmann::json::array({
+        cars[0] // Toyota Camry 2020
+    });
+    nlohmann::json specs = {{"brand", "Toyota"}, {"year", 2020}};
+
+    auto result = fetch_cars_by_specs(cars, specs);
+
+    BOOST_REQUIRE(result.is_array());
+    BOOST_CHECK(json_arrays_equal(result, expected_result));
+}
+
+BOOST_AUTO_TEST_CASE(fetch_cars_by_specs_NoMatch_ReturnsEmpty) {
+    auto cars = create_sample_cars_json();
+    nlohmann::json specs = {{"brand", "BMW"}, {"year", 2025}};
+
+    auto result = fetch_cars_by_specs(cars, specs);
+
+    BOOST_REQUIRE(result.is_array());
+    BOOST_CHECK_EQUAL(result.size(), 0U);
+}
+
+BOOST_AUTO_TEST_CASE(fetch_cars_by_specs_PartialMatch_OnlyExactMatched) {
+    auto cars = create_sample_cars_json();
+    // Ищем только по brand, должен вернуть все Toyota
+    nlohmann::json specs = {{"brand", "Toyota"}};
+    nlohmann::json expected_result = nlohmann::json::array({
+        cars[0] // Toyota Camry 2020
+    });
+
+    auto result = fetch_cars_by_specs(cars, specs);
+
+    BOOST_REQUIRE(result.is_array());
+    // В данном случае ожидаем одно совпадение по бренду, но specs не включает год
+    // fetch_cars_by_specs ищет точное совпадение для ВСЕХ указанных полей specs
+    // Поэтому результат должен быть пустым, если specs {"brand": "Toyota"} не является полным объектом машины
+    // Нужно уточнить поведение specs. Specs - это шаблон, по которому ищутся поля.
+    // fetch_cars_by_specs ищет машины, у которых все поля из specs совпадают со своими значениями.
+    // Поэтому {"brand": "Toyota"} означает найти машины, у которых brand="Toyota".
+    // Он не требует, чтобы у машины были все остальные поля из specs, только чтобы совпадали указанные.
+    // Исправленный ожидаемый результат:
+    nlohmann::json expected_result_partial = nlohmann::json::array();
+    for (const auto& car : cars) {
+         if (car.contains("brand") && car["brand"] == "Toyota") {
+             expected_result_partial.push_back(car);
+         }
+    }
+
+    BOOST_REQUIRE(result.is_array());
+    BOOST_CHECK(json_arrays_equal(result, expected_result_partial)); // Теперь проверяем все Toyota
+}
+
+
+BOOST_AUTO_TEST_CASE(fetch_cars_by_specs_MultipleMatches_ReturnsAll) {
+     auto cars = create_sample_cars_json();
+     // Поиск по типу топлива - должны вернуться Civic и F-150
+     nlohmann::json specs = {{"fuel_type", "Gasoline"}}; // Все в примере используют Gasoline
+     nlohmann::json expected_result = cars; // Все должны совпадать по specs
+
+     auto result = fetch_cars_by_specs(cars, specs);
+
+     BOOST_REQUIRE(result.is_array());
+     BOOST_CHECK(json_arrays_equal(result, expected_result));
+}
+
+BOOST_AUTO_TEST_CASE(fetch_cars_by_specs_NumericComparison_YearCheck) {
+     auto cars = create_sample_cars_json();
+     // Поиск машин старше 2020 года (не включая 2020)
+     // fetch_cars_by_specs делает точное сравнение. Для диапазонов нужна другая логика.
+     // Тестируем точное числовое совпадение.
+     nlohmann::json specs = {{"year", 2018}};
+     nlohmann::json expected_result = nlohmann::json::array({cars[1]}); // Honda Civic 2018
+
+     auto result = fetch_cars_by_specs(cars, specs);
+
+     BOOST_REQUIRE(result.is_array());
+     BOOST_CHECK(json_arrays_equal(result, expected_result));
+}
+
+// Тест для случая, когда в specs есть ключ, которого нет ни в одной машине
+BOOST_AUTO_TEST_CASE(fetch_cars_by_specs_KeyNotFound_ReturnsEmpty) {
+     auto cars = create_sample_cars_json();
+     nlohmann::json specs = {{"color", "Red"}}; // Поле color отсутствует в cars
+
+     auto result = fetch_cars_by_specs(cars, specs);
+
+     BOOST_REQUIRE(result.is_array());
+     BOOST_CHECK_EQUAL(result.size(), 0U);
+}
+
+
+BOOST_AUTO_TEST_SUITE_END()
