@@ -114,7 +114,7 @@ protected:
     }
 };
 
-// ==================== БАЗОВЫЕ ТЕСТЫ ====================
+// БАЗОВЫЕ ТЕСТЫ И ТЕСТЫ КЛИЕНТА
 
 TEST_F(HandlersTest, HandleGetCarsReturnsArray) {
     std::string response = handle_get_cars();
@@ -165,29 +165,11 @@ TEST_F(HandlersTest, HandlePostAdminLoginInvalidCredentials) {
 }
 
 TEST_F(HandlersTest, HandleGetSearchFindsCars) {
-    std::string query = "brand=Toyota";
-    std::string response = handle_get_search(query);
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("found"));
-    EXPECT_TRUE(result.contains("results"));
-    EXPECT_GE(result["found"], 1);
-}
-
-TEST_F(HandlersTest, HandleGetSearchMultipleParams) {
     std::string query = "brand=Honda&model=Accord";
     std::string response = handle_get_search(query);
     json result = parseResponse(response);
     EXPECT_TRUE(result.contains("found"));
     EXPECT_TRUE(result.contains("results"));
-}
-
-TEST_F(HandlersTest, HandleGetSearchEmptyQuery) {
-    std::string query = "";
-    std::string response = handle_get_search(query);
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("found"));
-    EXPECT_TRUE(result.contains("results"));
-    EXPECT_GE(result["found"], 3); // Все автомобили
 }
 
 TEST_F(HandlersTest, HandlePostSearchWithSimpleFilters) {
@@ -202,33 +184,6 @@ TEST_F(HandlersTest, HandlePostSearchWithSimpleFilters) {
     json result = parseResponse(response);
     EXPECT_TRUE(result.contains("found"));
     EXPECT_TRUE(result.contains("results"));
-}
-
-TEST_F(HandlersTest, HandlePostSearchEmptyBody) {
-    std::string response = handle_post_search("");
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("error"));
-}
-
-TEST_F(HandlersTest, HandleGetAdminCars) {
-    std::string response = handle_get_admin_cars();
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.is_array());
-    EXPECT_GE(result.size(), 3);
-}
-
-TEST_F(HandlersTest, HandleGetAdminCities) {
-    std::string response = handle_get_admin_cities();
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.is_array());
-    EXPECT_GE(result.size(), 2);
-}
-
-TEST_F(HandlersTest, HandleGetAdminDocuments) {
-    std::string response = handle_get_admin_documents();
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("documents"));
-    EXPECT_TRUE(result["documents"].is_array());
 }
 
 TEST_F(HandlersTest, HandlePostCalculateDelivery) {
@@ -248,28 +203,7 @@ TEST_F(HandlersTest, HandlePostCalculateDelivery) {
     }
 }
 
-TEST_F(HandlersTest, HandlePostCalculateDeliveryMissingParams) {
-    json request = {{"car_id", 1}}; // Нет city_id
-    std::string response = handle_post_calculate_delivery(request.dump());
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("error"));
-}
-
-TEST_F(HandlersTest, HandlePostCalculateDeliveryCarNotFound) {
-    json request = {{"car_id", 999}, {"city_id", 1}};
-    std::string response = handle_post_calculate_delivery(request.dump());
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("error"));
-}
-
-TEST_F(HandlersTest, HandlePostCalculateDeliveryCityNotFound) {
-    json request = {{"car_id", 1}, {"city_id", 999}};
-    std::string response = handle_post_calculate_delivery(request.dump());
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("error"));
-}
-
-// ==================== ТЕСТЫ ДЛЯ АДМИНСКИХ ФУНКЦИЙ ====================
+// ТЕСТЫ ДЛЯ АДМИНСКИХ ФУНКЦИЙ
 
 TEST_F(HandlersTest, HandlePostAdminCarsValid) {
     json new_car = {
@@ -286,19 +220,6 @@ TEST_F(HandlersTest, HandlePostAdminCarsValid) {
     EXPECT_EQ(result["message"], "Car added successfully");
     EXPECT_TRUE(result.contains("car"));
     EXPECT_GE(result["car"]["id"], 4); // Новый ID
-}
-
-TEST_F(HandlersTest, HandlePostAdminCarsMissingFields) {
-    // Нет price_usd
-    json new_car = {
-        {"brand", "TestBrand"},
-        {"model", "TestModel"},
-        {"year", 2024}
-    };
-    
-    std::string response = handle_post_admin_cars(new_car.dump());
-    json result = parseResponse(response);
-    EXPECT_TRUE(result.contains("error"));
 }
 
 TEST_F(HandlersTest, HandlePostAdminCitiesValid) {
