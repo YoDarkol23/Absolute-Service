@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include "../common/logger.hpp"
 #include "handlers.hpp"
 #include <iostream>
 #include <sstream>
@@ -50,6 +51,7 @@ CarDeliveryServer::CarDeliveryServer(unsigned short port)
     : acceptor_(io_context_, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port)) {}
 
 void CarDeliveryServer::run() {
+       Logger::log_info("Server started on port 8080");
     std::cout << "Сервер запущен на порту 8080\n";
     std::cout << "Ожидание подключений...\n";
 
@@ -67,6 +69,7 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         auto remote_ep = socket->remote_endpoint();
         std::string client_ip = remote_ep.address().to_string();
         std::cout << "[+] Новое подключение от " << client_ip << std::endl;
+        Logger::log_info("New connection from IP: " + client_ip);
 
         // Читаем весь запрос
         boost::asio::streambuf buffer;
@@ -76,6 +79,7 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         boost::asio::read_until(*socket, buffer, "\r\n\r\n", ec);
         if (ec && ec != boost::asio::error::eof) {
             std::cerr << "Ошибка чтения заголовков: " << ec.message() << std::endl;
+              Logger::log_error("Error reading headers from " + client_ip + ": " + ec.message());
             return;
         }
 
@@ -95,6 +99,7 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
             }
             catch (const std::exception& e) {
                 std::cerr << "Ошибка парсинга Content-Length: " << e.what() << std::endl;
+                  Logger::log_error("Error parsing Content-Length from " + client_ip + ": " + std::string(e.what()));
             }
         }
 
@@ -128,9 +133,11 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
         std::cout << "=== ЗАВЕРШАЮЩИЙ ЗАПРОС ===" << std::endl;
 
         if (request.find("GET /cars") == 0) {
+                Logger::log_info("Processing GET /cars request from " + client_ip);
             response_body = handle_get_cars();
         }
         else if (request.find("POST /search") == 0) {
+              Logger::log_info("Processing POST /search request from " + client_ip);
             size_t body_start = request.find("\r\n\r\n");
             if (body_start != std::string::npos) {
                 std::string body = request.substr(body_start + 4);
@@ -147,15 +154,19 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
                 : R"({"error": "Invalid query in GET /search"})";
         }
         else if (request.find("GET /cities") == 0) {
+            Logger::log_info("Processing GET /cities request from " + client_ip);
             response_body = handle_get_cities();
         }
         else if (request.find("GET /documents") == 0) {
+            Logger::log_info("Processing GET /documents request from " + client_ip);
             response_body = handle_get_documents();
         }
         else if (request.find("GET /delivery") == 0) {
+            Logger::log_info("Processing GET /delivery request from " + client_ip);
             response_body = handle_get_delivery();
         }
         else if (request.find("POST /admin/login") == 0) {
+            Logger::log_info("Processing POST /admin/login request from " + client_ip);
             size_t body_start = request.find("\r\n\r\n");
             if (body_start != std::string::npos) {
                 std::string body = request.substr(body_start + 4);
@@ -304,9 +315,11 @@ void CarDeliveryServer::handle_client(std::shared_ptr<boost::asio::ip::tcp::sock
 
         boost::asio::write(*socket, boost::asio::buffer(resp.str()));
         std::cout << "[✓] Запрос от " << client_ip << " обработан\n";
+            Logger::log_info("Request from " + client_ip + " processed successfully");
 
     }
     catch (std::exception& e) {
         std::cerr << "[!] Ошибка обработки клиента " << e.what() << std::endl;
+         Logger::log_error("Client processing error: " + std::string(e.what()));
     }
 }

@@ -1,4 +1,5 @@
 #include "handlers.hpp"
+#include "../common/logger.hpp"
 #include "../common/utils.hpp"
 #include "../common/json.hpp"
 #include <iostream>
@@ -28,8 +29,10 @@ std::string handle_get_cars() {
 std::string handle_post_search(const std::string& body) {
     try {
         std::cout << "POST /search body: " << body << std::endl;
+           Logger::log_info("Processing POST /search with body length: " + std::to_string(body.length()));
 
         if (body.empty()) {
+               Logger::log_warning("Empty body in POST /search request");
             return R"({"error": "Empty request body"})";
         }
 
@@ -97,12 +100,14 @@ std::string handle_post_search(const std::string& body) {
         response["found"] = results.size();
         response["results"] = results;
 
-        std::cout << "Найлено " << results.size() << " результаты" << std::endl;
+        std::cout << "Найдено " << results.size() << " результаты" << std::endl;
+        Logger::log_info("POST /search found " + std::to_string(results.size()) + " results");
         return response.dump();
 
     }
     catch (const std::exception& e) {
         std::cerr << "Search error: " << e.what() << std::endl;
+        Logger::log_error("POST /search error: " + std::string(e.what()));
         return R"({"error": ")" + std::string(e.what()) + "\"}";
     }
 }
@@ -226,8 +231,10 @@ std::string handle_post_admin_login(const std::string& body) {
             };
             return response.dump();
         }
+         Logger::log_info("Successful admin login for user: " + username);
         return R"({"error": "Invalid username or password"})";
     } catch (...) {
+           Logger::log_error("Malformed login request in POST /admin/login");
         return R"({"error": "Malformed login request"})";
     }
 }
